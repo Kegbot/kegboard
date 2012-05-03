@@ -33,8 +33,9 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#include "Arduino.h"
+
 #include "pins_arduino.h"
-#include "WProgram.h"
 
 volatile uint8_t *PCintPortToInputMask[] = {
   &PCMSK0,
@@ -136,15 +137,4 @@ static void PCint(uint8_t port) {
   }
   // Save current pin values
   PCintLast[port] = curr;
-}
-
-
-SIGNAL(PCINT0_vect) {
-  PCint(0);
-}
-SIGNAL(PCINT1_vect) {
-  PCint(1);
-}
-SIGNAL(PCINT2_vect) {
-  PCint(2);
 }

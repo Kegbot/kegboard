@@ -31,7 +31,6 @@
  * not need to change anything in this file.
  *
  * TODO:
- *  - implement serial reading (relay on/off) commands
  *  - get/set boardname with eeprom
  *  - Thermo:
  *    * check CRC
@@ -39,12 +38,13 @@
  *  - leak detect circuit/alarm support
  */
 
-#include <WProgram.h>
+#include "Arduino.h"
+
 #include <avr/pgmspace.h>
 #include <string.h>
 #include <util/crc16.h>
 #include <util/delay.h>
-#include <wiring.h>
+
 
 #include "kegboard.h"
 #include "kegboard_config.h"
@@ -61,8 +61,8 @@
 #endif
 
 #if KB_ENABLE_ID12_RFID
-#include "NewSoftSerial.h"
-NewSoftSerial gSerialRfid = NewSoftSerial(KB_PIN_SERIAL_RFID_RX, -1);
+#include <SoftwareSerial.h>
+static SoftwareSerial gSerialRfid(KB_PIN_SERIAL_RFID_RX, -1);
 int gRfidPos = -1;
 unsigned char gRfidChecksum = 0;
 unsigned char gRfidBuf[RFID_PAYLOAD_CHARS];

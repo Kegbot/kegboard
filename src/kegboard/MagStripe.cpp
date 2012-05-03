@@ -21,9 +21,11 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#include "Arduino.h"
+
 #include "MagStripe.h"
 #include "pins_arduino.h"
-#include "WProgram.h"
+
 
 MagStripe::MagStripe(uint8_t clockPin, uint8_t dataPin, uint8_t cardPresentPin) {
   _clockPin = clockPin;

@@ -18,8 +18,10 @@
 //     Support ID-12 RFID input
 //   v10 (2011-06-19)
 //     Reverse ID-12 RFID endianness.
+//   v11 (2012-05-02)
+//     Updates for Arduino SDK v1.0; no functional changes.
 
-#define FIRMWARE_VERSION 10
+#define FIRMWARE_VERSION 11
 
 #define BUILD_DATE __DATE__
 #define BUILD_TIME __TIME__

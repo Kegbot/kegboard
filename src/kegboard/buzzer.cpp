@@ -23,6 +23,8 @@
  * along with Kegbot.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "Arduino.h"
+
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/pgmspace.h>
@@ -30,7 +32,6 @@
 extern "C" {
 // For delay()
 #include <util/delay.h>
-#include "WConstants.h"
 }
 
 #include "buzzer.h"

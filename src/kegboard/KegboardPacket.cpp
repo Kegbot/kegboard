@@ -19,7 +19,7 @@
  * along with Kegbot.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "WProgram.h"
+#include "Arduino.h"
 #include "kegboard.h"
 #include "KegboardPacket.h"
 
@@ -34,8 +34,8 @@ static uint16_t crc_ccitt_update_int(uint16_t crc, int value) {
 }
 
 static void serial_print_int(int value) {
-  Serial.print(value & 0xff, BYTE);
-  Serial.print((value >> 8) & 0xff, BYTE);
+  Serial.write(value & 0xff);
+  Serial.write((value >> 8) & 0xff);
 }
 
 KegboardPacket::KegboardPacket()
@@ -134,12 +134,12 @@ void KegboardPacket::Print()
 
   // payload
   for (i=0; i<m_len; i++) {
-    Serial.print(m_payload[i], BYTE);
+    Serial.write(m_payload[i]);
     crc = _crc_ccitt_update(crc, m_payload[i]);
   }
 
   // trailer
   serial_print_int(crc);
-  Serial.print('\r', BYTE);
-  Serial.print('\n', BYTE);
+  Serial.write('\r');
+  Serial.write('\n');
 }
