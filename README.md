@@ -21,7 +21,7 @@ cool kids are.
 
 ## License and Copyright
 
-All code is offered under the **GPLv3** license, unless otherwise noted.  Please see
+All code is offered under the **GPLv2** license, unless otherwise noted.  Please see
 ``LICENSE.txt`` for the full license.
 
 All code and documentation are **Copyright 2003-2012 Mike Wakerly**, unless otherwise noted.
