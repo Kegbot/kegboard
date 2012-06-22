@@ -68,7 +68,6 @@
 
 // Number of relay outputs
 #define KB_NUM_RELAY_OUTPUTS 6
-
 // Maximum time a relay will remain enabled after a "set_output" command.  The
 // timer is reset whenenver a new "set_output" command is received.
 #define KB_RELAY_WATCHDOG_MS 10000

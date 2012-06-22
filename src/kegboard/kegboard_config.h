@@ -23,6 +23,9 @@
 // Enable MagStripe reader?
 #define KB_ENABLE_MAGSTRIPE 0
 
+// Enable Weigand reader?
+#define KB_ENABLE_WEIGAND 0
+
 //
 // Pin configuration - KEGBOARD VERSION
 //
@@ -87,6 +90,17 @@
 #define KB_PIN_METER_F            18
 #else
 #define KB_NUM_METERS             2
+#endif
+
+// If enabling a Weigand reader, we need two of the interrupt pins
+// on the Arduino Mega. So, reducing KB_NUM_METERS to 2
+// You can move the reader pins by adjusting the interrupt values
+// and pin values here
+#if KB_ENABLE_WEIGAND
+#define KB_INT_WEIGAND_BIT0 2
+#define KB_INT_WEIGAND_BIT1 3
+#define KB_PIN_WEIGAND_BIT0 21
+#define KB_PIN_WEIGAND_BIT1 20
 #endif
 
 //

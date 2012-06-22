@@ -73,6 +73,11 @@ unsigned char gRfidBuf[RFID_PAYLOAD_CHARS];
 #include "PCInterrupt.h"
 #endif
 
+#if KB_ENABLE_WEIGAND
+#include "weigand.h"
+Weigand_Card myWeigandCard;
+#endif
+
 //
 // Other Globals
 //
@@ -328,6 +333,15 @@ void doTestPulse()
       digitalWrite(KB_PIN_TEST_PULSE, 1);
       digitalWrite(KB_PIN_TEST_PULSE, 0);
     }
+  }
+}
+#endif
+
+#if KB_ENABLE_WEIGAND
+void stepReadWeigandCard() {
+  unsigned long lngcarddata = myWeigandCard.getdata();
+  if(lngcarddata != 0){
+    writeAuthPacket("weigand",(uint8_t*)&(lngcarddata),4,1);
   }
 }
 #endif
@@ -809,6 +823,10 @@ void loop()
 
 #if KB_ENABLE_SELFTEST
   doTestPulse();
+#endif
+
+#if KB_ENABLE_WEIGAND
+ stepReadWeigandCard();
 #endif
 }
 
