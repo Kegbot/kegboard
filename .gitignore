@@ -1,0 +1,7 @@
+### global stuff
+*.DS_Store
+*.pyc
+*.egg
+
+python/distribute-*
+python/*egg-info
