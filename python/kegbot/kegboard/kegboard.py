@@ -31,7 +31,13 @@ import gflags
 from kegbot.util import util
 from . import crc16
 
-_DEVICES = glob.glob('/dev/ttyUSB*') + glob.glob('/dev/cu.usbserial*')
+_DEVICES = (
+    glob.glob('/dev/ttyUSB*') +
+    glob.glob('/dev/ttyACM*') +
+    glob.glob('/dev/cu.usbserial*') +
+    glob.glob('/dev/tty.usbmodem*')
+)
+
 if _DEVICES:
   _DEFAULT_PORT = _DEVICES[0]
 else:
