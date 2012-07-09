@@ -151,6 +151,13 @@ PROGMEM prog_uint16_t BOOT_MELODY[] = {
   MELODY_NOTE(0, NOTE_SILENCE, 0)
 };
 
+PROGMEM prog_uint16_t PING_MELODY[] = {
+  MELODY_NOTE(4, 7, 100), MELODY_NOTE(0, NOTE_SILENCE, 25),
+  MELODY_NOTE(4, 3, 100), MELODY_NOTE(0, NOTE_SILENCE, 25),
+
+  MELODY_NOTE(0, NOTE_SILENCE, 0)
+};
+
 #if (KB_ENABLE_ID12_RFID || KB_ENABLE_ONEWIRE_PRESENCE)
 PROGMEM prog_uint16_t AUTH_ON_MELODY[] = {
   MELODY_NOTE(4, 1, 50), MELODY_NOTE(0, NOTE_SILENCE, 10),
@@ -720,6 +727,9 @@ void handleInputPacket() {
   // Process the input packet.
   switch (gInputPacket.GetType()) {
     case KBM_PING:
+#if KB_ENABLE_BUZZER
+      playMelody(PING_MELODY);
+#endif
       writeHelloPacket();
       break;
 

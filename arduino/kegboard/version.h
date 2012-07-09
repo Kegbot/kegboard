@@ -20,8 +20,10 @@
 //     Reverse ID-12 RFID endianness.
 //   v11 (2012-05-02)
 //     Updates for Arduino SDK v1.0; no functional changes.
+//   v12 (2012-07-07)
+//     Respond to ping with a short melody.
 
-#define FIRMWARE_VERSION 11
+#define FIRMWARE_VERSION 12
 
 #define BUILD_DATE __DATE__
 #define BUILD_TIME __TIME__
