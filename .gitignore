@@ -2,6 +2,10 @@
 *.DS_Store
 *.pyc
 *.egg
+*.o
 
+python/dist/*
 python/distribute-*
 python/*egg-info
+
+arduino/kegboard/build-cli
