@@ -1,7 +1,7 @@
-TARGET = kegboard-v3
-MCU = atmega168
-F_CPU = 16000000
+BOARD_TAG    = uno
+ARDUINO_PORT = /dev/cu.usb*
 ARDUINO_LIBS = EEPROM SoftwareSerial
+ARDMK_DIR = lib/arduino-makefile
 
 UNAME_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
 
@@ -19,4 +19,4 @@ ARDUINO_DIR ?= /Applications/Arduino.app/Contents/Resources/Java
 ARDUINO_PORT ?= /dev/tty.usbserial*
 endif
 
-include Arduino.mk
+include $(ARDMK_DIR)/arduino-mk/Arduino.mk
