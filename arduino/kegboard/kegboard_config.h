@@ -23,6 +23,10 @@
 // Enable MagStripe reader?
 #define KB_ENABLE_MAGSTRIPE 0
 
+// Enable Wiegand RFID reader?
+// Note: Must set KB_ENABLE_ID12_RFID to 0 if enabling this.
+#define KB_ENABLE_WIEGAND_RFID 0
+
 //
 // Pin configuration - KEGBOARD VERSION
 //
@@ -76,6 +80,9 @@
 #define KB_PIN_MAGSTRIPE_DATA     A4
 #define KB_PIN_MAGSTRIPE_CARD_PRESENT A5
 
+#define KB_PIN_WIEGAND_RFID_DATA0 A4
+#define KB_PIN_WIEGAND_RFID_DATA1 A5
+
 // Atmega1280 (aka Arduino mega) section
 #ifdef __AVR_ATmega1280__
 #define KB_ATMEGA_1280            1
@@ -105,3 +112,13 @@
 // non-responding onewire id missing.  This is used to dampen against glitches
 // where a device might be absent from a search.
 #define ONEWIRE_CACHE_MAX_MISSING_SEARCHES 4
+
+//
+// Error checking
+//
+
+#if KB_ENABLE_ID12_RFID and KB_ENABLE_WIEGAND_RFID
+// TODO(mikey): work around pin change interrupt sharing issues.
+#error "ID12 RFID and WIEGAND RFID cannot be used together."
+#error "Please disable one of them in kegboard_config.h"
+#endif

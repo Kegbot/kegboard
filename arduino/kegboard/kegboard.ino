@@ -73,6 +73,11 @@ unsigned char gRfidBuf[RFID_PAYLOAD_CHARS];
 #include "PCInterrupt.h"
 #endif
 
+#if KB_ENABLE_WIEGAND_RFID
+#include "Wiegand.h"
+#include "PCInterrupt.h"
+#endif
+
 //
 // Other Globals
 //
@@ -182,6 +187,12 @@ static OneWire gOnewireIdBus(KB_PIN_ONEWIRE_PRESENCE);
 static MagStripe gMagStripe(KB_PIN_MAGSTRIPE_CLOCK, KB_PIN_MAGSTRIPE_DATA, KB_PIN_MAGSTRIPE_CARD_PRESENT);
 #endif
 
+#if KB_ENABLE_WIEGAND_RFID
+#define WIEGAND_TIMEOUT_MILLIS 200
+static Wiegand gWiegand;
+static unsigned long gLastWiegandInterruptMillis = 0;
+#endif
+
 //
 // ISRs
 //
@@ -230,6 +241,17 @@ void meterInterruptF()
 void magStripeClockInterrupt()
 {
   gMagStripe.clockData();
+}
+#endif
+
+#if KB_ENABLE_WIEGAND_RFID
+void wiegandData0() {
+  gWiegand.handleData0Pulse();
+  gLastWiegandInterruptMillis = millis();
+}
+void wiegandData1() {
+  gWiegand.handleData1Pulse();
+  gLastWiegandInterruptMillis = millis();
 }
 #endif
 
@@ -409,6 +431,18 @@ void setup()
 
 #if KB_ENABLE_MAGSTRIPE
   PCattachInterrupt(KB_PIN_MAGSTRIPE_CLOCK, magStripeClockInterrupt, FALLING);
+#endif
+
+#if KB_ENABLE_WIEGAND_RFID
+  PCattachInterrupt(KB_PIN_WIEGAND_RFID_DATA0, wiegandData0, FALLING);
+  PCattachInterrupt(KB_PIN_WIEGAND_RFID_DATA1, wiegandData1, FALLING);
+
+  pinMode(KB_PIN_WIEGAND_RFID_DATA0, INPUT);
+  pinMode(KB_PIN_WIEGAND_RFID_DATA1, INPUT);
+  digitalWrite(KB_PIN_WIEGAND_RFID_DATA0, HIGH);
+  digitalWrite(KB_PIN_WIEGAND_RFID_DATA1, HIGH);
+  gWiegand.reset();
+  gLastWiegandInterruptMillis = 0;
 #endif
 
   writeHelloPacket();
@@ -705,6 +739,26 @@ out_reset:
   resetInputPacket();
 }
 
+#if KB_ENABLE_WIEGAND_RFID
+void doProcessWiegand() {
+  if (gLastWiegandInterruptMillis == 0) {
+    return;
+  }
+  unsigned long now = millis();
+
+  if ((now - gLastWiegandInterruptMillis) > WIEGAND_TIMEOUT_MILLIS) {
+    uint8_t buf[WIEGAND_BUFSIZ];
+    int num_bits = gWiegand.getData(buf);
+    if (num_bits > 0) {
+      writeAuthPacket("core.rfid", buf, WIEGAND_BUFSIZ, 1);
+      writeAuthPacket("core.rfid", buf, WIEGAND_BUFSIZ, 0);
+    }
+    gWiegand.reset();
+    gLastWiegandInterruptMillis = 0;
+  }
+}
+#endif
+
 void setRelayOutput(uint8_t id, uint8_t mode) {
   gRelayStatus[id].touched_timestamp_ms = millis();
   if (mode == OUTPUT_DISABLED && gRelayStatus[id].enabled) {
@@ -815,6 +869,10 @@ void loop()
 
 #if KB_ENABLE_MAGSTRIPE
   doProcessMagStripe();
+#endif
+
+#if KB_ENABLE_WIEGAND_RFID
+  doProcessWiegand();
 #endif
 
 #if KB_ENABLE_SELFTEST

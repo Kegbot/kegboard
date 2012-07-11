@@ -34,8 +34,8 @@
 //
 
 #include "Arduino.h"
-
 #include "pins_arduino.h"
+#include "kegboard_config.h"
 
 volatile uint8_t *PCintPortToInputMask[] = {
   &PCMSK0,
@@ -51,7 +51,7 @@ volatile static voidFuncPtr PCintFunc[24] = { NULL };
 
 volatile static uint8_t PCintLast[3];
 
- void PCattachInterrupt(uint8_t pin, void (*userFunc)(void), int mode) {
+void PCattachInterrupt(uint8_t pin, void (*userFunc)(void), int mode) {
   uint8_t bit = digitalPinToBitMask(pin);
   uint8_t port = digitalPinToPort(pin);
   uint8_t slot;
@@ -61,11 +61,10 @@ volatile static uint8_t PCintLast[3];
   // map pin to PCIR register
   if (port == NOT_A_PORT) {
     return;
-  } 
-  else {
-    port -= 2;
-    pcmask = PCintPortToInputMask[port];
   }
+
+  port -= 2;
+  pcmask = PCintPortToInputMask[port];
 
   // Fix by Baziki. In the original sources there was a little bug,
   // which caused analog ports to work incorrectly.
@@ -138,3 +137,16 @@ static void PCint(uint8_t port) {
   // Save current pin values
   PCintLast[port] = curr;
 }
+
+#if KB_ENABLE_WIEGAND_RFID
+SIGNAL(PCINT0_vect) {
+  PCint(0);
+}
+SIGNAL(PCINT1_vect) {
+  PCint(1);
+}
+SIGNAL(PCINT2_vect) {
+  PCint(2);
+}
+#endif
+
