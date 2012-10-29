@@ -17,3 +17,4 @@ Contents:
    firmware
    wiring
    serial-protocol
+   changelog
