@@ -36,7 +36,7 @@ Standard features of Kegboard on Arduino:
   DS18B20) temperature sensors.  An unlimited number of sensors can be
   connected, allowing you to independently track keg temperature and ambient
   temperature.
-* **RFID Authenticaton:** Authenticate users with cheap 125kHz RFIDs by
+* **RFID Authentication:** Authenticate users with cheap 125kHz RFIDs by
   connecting the optional ID-12 RFID reader.
 * **OneWire Authentication:** Authenticate users with durable iButtons.
 * **Relay/Value Control:** Four general purpose outputs can be used
