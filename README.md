@@ -5,7 +5,7 @@ Kegboard with Kegbot, or something else.
 
 The main repository is located at: https://github.com/Kegbot/kegboard
 
-You can find more information about Kegboard at: http://kegbot.org/kegboard/
+You can find more information about Kegboard at: http://kegbot.org/docs/kegboard/
 
 ## More Info & Help
 
