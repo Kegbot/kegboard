@@ -322,6 +322,18 @@ void writeMeterPacket(int channel)
   } else {
     gLastMeters[channel] = status;
   }
+
+  switch (channel) {
+    case 0:
+      digitalWrite(KB_PIN_LED_FLOW_A, HIGH);
+      break;
+    case 1:
+      digitalWrite(KB_PIN_LED_FLOW_B, HIGH);
+      break;
+    default:
+      break;
+  }
+
   name[4] = 0x30 + channel;
   KegboardPacket packet;
   packet.SetType(KBM_METER_STATUS);
@@ -417,11 +429,17 @@ void setup()
 
   Serial.begin(115200);
 
+  digitalWrite(KB_PIN_LED_FLOW_A, HIGH);
+  digitalWrite(KB_PIN_LED_FLOW_B, HIGH);
+
 #if KB_ENABLE_BUZZER
   pinMode(KB_PIN_BUZZER, OUTPUT);
   setupBuzzer();
   playMelody(BOOT_MELODY);
 #endif
+
+  digitalWrite(KB_PIN_LED_FLOW_A, LOW);
+  digitalWrite(KB_PIN_LED_FLOW_B, LOW);
 
 #if KB_ENABLE_ID12_RFID
   gSerialRfid.begin(9600);
@@ -878,6 +896,9 @@ void loop()
 #if KB_ENABLE_SELFTEST
   doTestPulse();
 #endif
+
+  digitalWrite(KB_PIN_LED_FLOW_A, LOW);
+  digitalWrite(KB_PIN_LED_FLOW_B, LOW);
 }
 
 // vim: syntax=c
