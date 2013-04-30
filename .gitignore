@@ -3,9 +3,11 @@
 *.pyc
 *.egg
 *.o
+*.hex
 
 python/dist/*
 python/distribute-*
 python/*egg-info
 
-arduino/kegboard/build-cli
+arduino/kegboard/.dep
+arduino/kegboard/.lib
