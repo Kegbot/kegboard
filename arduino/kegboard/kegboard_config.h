@@ -27,6 +27,14 @@
 // Note: Must set KB_ENABLE_ID12_RFID to 0 if enabling this.
 #define KB_ENABLE_WIEGAND_RFID 0
 
+// Enable software debounce? EXPERIMENTAL. Enabling this feature may negatively
+// affect pour accuracy.  In particular, a delay is added to each flow meter
+// ISR, disabling all other interrupts during this time.
+#define KB_ENABLE_SOFT_DEBOUNCE 0
+
+// Approximate minimum pulse width required for incoming external interrupts.
+#define KB_SOFT_DEBOUNCE_MICROS 1200
+
 //
 // Pin configuration - KEGBOARD VERSION
 //

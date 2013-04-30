@@ -45,7 +45,6 @@
 #include <util/crc16.h>
 #include <util/delay.h>
 
-
 #include "kegboard.h"
 #include "kegboard_config.h"
 #include "ds1820.h"
@@ -197,43 +196,55 @@ static unsigned long gLastWiegandInterruptMillis = 0;
 // ISRs
 //
 
+#if KB_ENABLE_SOFT_DEBOUNCE
+#define CHECK_METER(pin, meter_index)                   \
+  do {                                                  \
+    delayMicroseconds(KB_SOFT_DEBOUNCE_MICROS);         \
+    if (digitalRead(pin) == 0)                          \
+      gMeters[meter_index] += 1;                        \
+  } while(0)
+#else
+#define CHECK_METER(pin, meter_index)                   \
+  gMeters[meter_index] += 1
+#endif
+
 void meterInterruptA()
 {
-  gMeters[0] += 1;
+  CHECK_METER(KB_PIN_METER_A, 0);
 }
 
 #ifdef KB_PIN_METER_B
 void meterInterruptB()
 {
-  gMeters[1] += 1;
+  CHECK_METER(KB_PIN_METER_B, 1);
 }
 #endif
 
 #ifdef KB_PIN_METER_C
 void meterInterruptC()
 {
-  gMeters[2] += 1;
+  CHECK_METER(KB_PIN_METER_C, 2);
 }
 #endif
 
 #ifdef KB_PIN_METER_D
 void meterInterruptD()
 {
-  gMeters[3] += 1;
+  CHECK_METER(KB_PIN_METER_D, 3);
 }
 #endif
 
 #ifdef KB_PIN_METER_E
 void meterInterruptE()
 {
-  gMeters[4] += 1;
+  CHECK_METER(KB_PIN_METER_E, 4);
 }
 #endif
 
 #ifdef KB_PIN_METER_F
 void meterInterruptF()
 {
-  gMeters[5] += 1;
+  CHECK_METER(KB_PIN_METER_F, 1);
 }
 #endif
 
@@ -386,36 +397,36 @@ void setup()
   // from ticking away.
   pinMode(KB_PIN_METER_A, INPUT);
   digitalWrite(KB_PIN_METER_A, HIGH);
-  attachInterrupt(0, meterInterruptA, RISING);
+  attachInterrupt(0, meterInterruptA, FALLING);
 
 #ifdef KB_PIN_METER_B
   pinMode(KB_PIN_METER_B, INPUT);
   digitalWrite(KB_PIN_METER_B, HIGH);
-  attachInterrupt(1, meterInterruptB, RISING);
+  attachInterrupt(1, meterInterruptB, FALLING);
 #endif
 
 #ifdef KB_PIN_METER_C
   pinMode(KB_PIN_METER_C, INPUT);
   digitalWrite(KB_PIN_METER_C, HIGH);
-  attachInterrupt(2, meterInterruptC, RISING);
+  attachInterrupt(2, meterInterruptC, FALLING);
 #endif
 
 #ifdef KB_PIN_METER_D
   pinMode(KB_PIN_METER_D, INPUT);
   digitalWrite(KB_PIN_METER_D, HIGH);
-  attachInterrupt(3, meterInterruptD, RISING);
+  attachInterrupt(3, meterInterruptD, FALLING);
 #endif
 
 #ifdef KB_PIN_METER_E
   pinMode(KB_PIN_METER_E, INPUT);
   digitalWrite(KB_PIN_METER_E, HIGH);
-  attachInterrupt(4, meterInterruptE, RISING);
+  attachInterrupt(4, meterInterruptE, FALLING);
 #endif
 
 #ifdef KB_PIN_METER_F
   pinMode(KB_PIN_METER_F, INPUT);
   digitalWrite(KB_PIN_METER_F, HIGH);
-  attachInterrupt(5, meterInterruptF, RISING);
+  attachInterrupt(5, meterInterruptF, FALLING);
 #endif
 
   pinMode(KB_PIN_RELAY_A, OUTPUT);

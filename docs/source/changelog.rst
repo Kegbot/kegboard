@@ -6,6 +6,11 @@ Changelog
 Arduino Firmware
 -----------------
 
+Current Version (in development)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+* Flow LEDs are now toggled on system startup and during pours.
+* Experimental debounce feature.
+
 v13 (2012-10-28)
 ^^^^^^^^^^^^^^^^
 * Adds support for Wiegand RFID readers (HID ProxPro and similar).
