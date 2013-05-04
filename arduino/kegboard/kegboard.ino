@@ -204,8 +204,7 @@ static unsigned long gLastWiegandInterruptMillis = 0;
       gMeters[meter_index] += 1;                        \
   } while(0)
 #else
-#define CHECK_METER(pin, meter_index)                   \
-  gMeters[meter_index] += 1
+#define CHECK_METER(pin, meter_index)  gMeters[meter_index] += 1
 #endif
 
 void meterInterruptA()
