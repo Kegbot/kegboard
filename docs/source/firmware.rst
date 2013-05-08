@@ -15,10 +15,10 @@ Download the software from the `Arduino Downloads Page
 Mac OS X, and Windows.
 
 .. note::
-  The recommended version is Arduino 1.0.
+  The latest tested version is Arduino 1.0.4
 
 When unzipped you will have a single directory that contains all the arduino
-software. The name will be something like ``arduino-1.0/`` (the version number
+software. The name will be something like ``arduino-1.0.4/`` (the version number
 will be different for previous versions.)
 
 Place this directory somewhere appropriate. For Mac users, you can drag it to
