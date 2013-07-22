@@ -17,6 +17,10 @@
 // Enable buzzer?
 #define KB_ENABLE_BUZZER    1
 
+// Enable PARALLAX RFID?
+#define KB_ENABLE_PARALLAX_RFID 0
+#define KB_ENABLE_PARALLAX_RFID_LEGACY_TAGS 0
+
 // Enable ID-12 RFID?
 #define KB_ENABLE_ID12_RFID 1
 
@@ -65,7 +69,12 @@
 //
 
 #define KB_PIN_METER_A            2
+//Parallax RFID needs two IO pins, using flow meter B's by default
+#if KB_ENABLE_PARALLAX_RFID
+#define KB_PIN_SERIAL_RFID_TX     3
+#else
 #define KB_PIN_METER_B            3
+#endif
 #define KB_PIN_LED_FLOW_A         4
 #define KB_PIN_LED_FLOW_B         5
 #define KB_PIN_SERIAL_RFID_RX     6
