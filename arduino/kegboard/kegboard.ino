@@ -67,6 +67,13 @@ unsigned char gRfidChecksum = 0;
 unsigned char gRfidBuf[RFID_PAYLOAD_CHARS];
 #endif
 
+#if KB_ENABLE_PARALLAX_RFID
+#include <SoftwareSerial.h>
+static SoftwareSerial gSerialRfid(KB_PIN_SERIAL_RFID_RX, KB_PIN_SERIAL_RFID_TX);
+int gRfidPos = -1;
+unsigned char gRfidBuf[RFID_PARALLAX_LEGACY_PAYLOAD_CHARS];
+#endif
+
 #if KB_ENABLE_MAGSTRIPE
 #include "MagStripe.h"
 #include "PCInterrupt.h"
@@ -162,7 +169,7 @@ PROGMEM prog_uint16_t PING_MELODY[] = {
   MELODY_NOTE(0, NOTE_SILENCE, 0)
 };
 
-#if (KB_ENABLE_ID12_RFID || KB_ENABLE_ONEWIRE_PRESENCE)
+#if (KB_ENABLE_ID12_RFID || KB_ENABLE_ONEWIRE_PRESENCE || KB_ENABLE_PARALLAX_RFID)
 PROGMEM prog_uint16_t AUTH_ON_MELODY[] = {
   MELODY_NOTE(4, 1, 50), MELODY_NOTE(0, NOTE_SILENCE, 10),
   MELODY_NOTE(4, 4, 50 ), MELODY_NOTE(0, NOTE_SILENCE, 10),
@@ -457,6 +464,12 @@ void setup()
   digitalWrite(KB_PIN_RFID_RESET, HIGH);
 #endif
 
+#if KB_ENABLE_PARALLAX_RFID
+  gSerialRfid.begin(9600);
+  pinMode(KB_PIN_SERIAL_RFID_RX, INPUT);
+  pinMode(KB_PIN_SERIAL_RFID_TX, OUTPUT);
+#endif
+
 #if KB_ENABLE_MAGSTRIPE
   PCattachInterrupt(KB_PIN_MAGSTRIPE_CLOCK, magStripeClockInterrupt, FALLING);
 #endif
@@ -652,6 +665,75 @@ static void doProcessRfid() {
 out_reset:
   gRfidPos = -1;
   gRfidChecksum = 0;
+}
+#endif
+
+#if KB_ENABLE_PARALLAX_RFID && !KB_ENABLE_PARALLAX_RFID_LEGACY_TAGS
+static void doProcessParallaxRfid() {
+  if (gSerialRfid.available() > 0) {
+    int errorCode;
+    errorCode = gSerialRfid.read();
+    if (errorCode != 0x01) {
+      return;
+    } else {
+      int pos = 0;
+      while (pos < RFID_PARALLAX_PAYLOAD_CHARS) {
+        if (gSerialRfid.available() > 0) {
+          gRfidBuf[pos] = gSerialRfid.read();
+          pos++;
+        }
+      }
+      if (pos == RFID_PARALLAX_PAYLOAD_CHARS) {
+        writeAuthPacket("core.rfid", gRfidBuf, 4, 1 );
+      }
+    }
+  }
+}
+
+#elif KB_ENABLE_PARALLAX_RFID && KB_ENABLE_PARALLAX_RFID_LEGACY_TAGS
+static void doProcessParallaxRfid() {
+  if (gSerialRfid.available() > 0) {
+    int errorCode;
+    errorCode = gSerialRfid.read();
+    if (errorCode != 10) {
+      return;
+    } else {
+      int pos = 0;
+      while (pos < RFID_PARALLAX_LEGACY_PAYLOAD_CHARS) {
+        if (gSerialRfid.available() > 0) {
+          gRfidBuf[pos] = gSerialRfid.read();
+          if ((gRfidBuf[pos] == 10) || (gRfidBuf[pos] == 13)) {
+            break;
+          }
+          pos++;
+        }
+      }
+      if (pos == RFID_PARALLAX_LEGACY_PAYLOAD_CHARS) {
+        writeAuthPacket("core.rfid", gRfidBuf, 10, 1 );
+      }
+    }
+
+  }
+}
+#endif
+
+#if KB_ENABLE_PARALLAX_RFID
+long    previousTimer = 0;
+static void doProcessRfid() {
+  long timer = millis();
+  if ((timer - previousTimer) > 400) {
+#if KB_ENABLE_PARALLAX_RFID_LEGACY_TAGS
+    gSerialRfid.print("!RW");
+    gSerialRfid.write(0x0F);
+#else
+    gSerialRfid.print("!RW");
+    gSerialRfid.write(0x01);
+    gSerialRfid.write(byte(32));
+#endif
+    previousTimer = timer;
+  } else {
+      doProcessParallaxRfid();
+  }
 }
 #endif
 
@@ -892,6 +974,10 @@ void loop()
 #endif
 
 #if KB_ENABLE_ID12_RFID
+  doProcessRfid();
+#endif
+
+#if KB_ENABLE_PARALLAX_RFID
   doProcessRfid();
 #endif
 
