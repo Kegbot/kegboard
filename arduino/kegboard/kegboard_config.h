@@ -134,7 +134,7 @@
 // Error checking
 //
 
-#if KB_ENABLE_ID12_RFID and KB_ENABLE_WIEGAND_RFID
+#if (KB_ENABLE_ID12_RFID + KB_ENABLE_WIEGAND_RFID + KB_ENABLE_PARALLAX_RFID) > 1
 // TODO(mikey): work around pin change interrupt sharing issues.
 #error "ID12 RFID and WIEGAND RFID cannot be used together."
 #error "Please disable one of them in kegboard_config.h"
