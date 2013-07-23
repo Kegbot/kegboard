@@ -1834,11 +1834,11 @@ Standard 0603 ceramic capacitor, and 0.1" leaded capacitor.</description>
 <wire x1="7.15" y1="3.35" x2="7.15" y2="2.35" width="0.0508" layer="51"/>
 <wire x1="7.15" y1="2.35" x2="6.15" y2="2.35" width="0.0508" layer="51"/>
 <wire x1="6.15" y1="2.35" x2="6.15" y2="3.35" width="0.0508" layer="51"/>
-<wire x1="6.4" y1="4" x2="6.8" y2="4" width="0.2032" layer="21"/>
-<wire x1="6.8" y1="4" x2="6.6" y2="3.8" width="0.2032" layer="21"/>
-<wire x1="6.6" y1="3.8" x2="6.4" y2="4" width="0.2032" layer="21"/>
-<pad name="1" x="6.65" y="2.85" drill="0.8" shape="square"/>
-<pad name="3" x="2.65" y="2.85" drill="0.8"/>
+<wire x1="2.4" y1="4" x2="2.8" y2="4" width="0.2032" layer="21"/>
+<wire x1="2.8" y1="4" x2="2.6" y2="3.8" width="0.2032" layer="21"/>
+<wire x1="2.6" y1="3.8" x2="2.4" y2="4" width="0.2032" layer="21"/>
+<pad name="1" x="2.65" y="2.85" drill="0.8" shape="square"/>
+<pad name="3" x="6.65" y="2.85" drill="0.8"/>
 <pad name="2" x="4.65" y="2.85" drill="0.8"/>
 <text x="0.5825" y="4.7375" size="1.016" layer="25" ratio="18">&gt;NAME</text>
 <text x="0.54" y="-1.045" size="0.8128" layer="27" ratio="10">&gt;VALUE</text>
