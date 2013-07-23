@@ -6,10 +6,11 @@ Changelog
 Arduino Firmware
 -----------------
 
-Current Version (in development)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+v14 (2013-07-23)
+^^^^^^^^^^^^^^^^
 * Flow LEDs are now toggled on system startup and during pours.
 * Experimental debounce feature.
+* Support for Parallax RFID readers.
 
 v13 (2012-10-28)
 ^^^^^^^^^^^^^^^^
