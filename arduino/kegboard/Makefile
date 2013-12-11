@@ -396,29 +396,38 @@ $(TARGET).hex: $(TARGET).elf
 $(TARGET).elf: $(ARDUINOLIB) $(OBJECTS)
 	$(CC) $(LINKFLAGS) $(OBJECTS) $(ARDUINOLIB) -lm -o $@
 
-%.o: %.c
+%.o: %.c .dep
+	echo "Build $@"
 	mkdir -p .dep/$(dir $<)
 	$(COMPILE.c) $(CPPDEPFLAGS) -o $@ $<
 
-%.o: %.cpp
+%.o: %.cpp .dep
+	echo "Build $@"
 	mkdir -p .dep/$(dir $<)
 	$(COMPILE.cpp) $(CPPDEPFLAGS) -o $@ $<
 
-%.o: %.cc
+%.o: %.cc .dep
+	echo "Build $@"
 	mkdir -p .dep/$(dir $<)
 	$(COMPILE.cpp) $(CPPDEPFLAGS) -o $@ $<
 
-%.o: %.C
+%.o: %.C .dep
+	echo "Build $@"
 	mkdir -p .dep/$(dir $<)
 	$(COMPILE.cpp) $(CPPDEPFLAGS) -o $@ $<
 
-%.o: %.ino
+%.o: %.ino .dep
+	echo "Build $@ ino"; echo `pwd`
 	mkdir -p .dep/$(dir $<)
 	$(COMPILE.cpp) $(CPPDEPFLAGS) -o $@ $(CPPINOFLAGS) $<
 
-%.o: %.pde
+%.o: %.pde .dep
+	echo "Build $@ pde"
 	mkdir -p .dep/$(dir $<)
 	$(COMPILE.cpp) $(CPPDEPFLAGS) -o $@ $(CPPINOFLAGS) $<
+
+.dep:
+	mkdir -p $@
 
 # building the arduino library
 
