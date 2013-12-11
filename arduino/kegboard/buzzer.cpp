@@ -1,3 +1,5 @@
+#if KB_ENABLE_BUZZER
+
 /**
  * buzzer.c - Arduino buzzer routines
  * Copyright 2009 Mike Wakerly <opensource@hoho.com>
@@ -51,7 +53,7 @@ void setupBuzzer()
   // Note: Buzzer uses the atmega timer2, which is responsible for arduino PWM
   // pins 3 and 11.  Arduino PWM routines (eg analogWrite) cannot be used on
   // these pins when the buzzer is enabled.
-  TCCR2A = (0<<COM0A1) | (1<<COM0A0) | (0<<WGM02) | (1<<WGM01) | (0<<WGM00);
+  //TCCR2A = (0<<COM0A1) | (1<<COM0A0) | (0<<WGM02) | (1<<WGM01) | (0<<WGM00);
 }
 
 // play the note (note=NOTE_SILENCE turns off)
@@ -88,3 +90,5 @@ void playMelody(prog_uint16_t* notes)
     delay(duration);
   }
 }
+
+#endif
