@@ -322,6 +322,20 @@ This command is sent to the board to enable or disable a device output.
 | 0x02    | output_mode     | output_t | Mode to set the output.               |
 +---------+-----------------+----------+---------------------------------------+
 
+``set_rgb`` command (0x85)
+------------------------------------
+
+This command is sent to the board to set the color of any RGB LEDs attached.
+
++---------+-----------------+----------+---------------------------------------+
+| Tag ID  | Name            | Type     | Description                           |
++=========+=================+==========+=======================================+
+| 0x01    | red             | uint8_t  | Red value (0-255).                    |
++---------+-----------------+----------+---------------------------------------+
+| 0x02    | green           | uint8_t  | Green value (0-255).                  |
++---------+-----------------+----------+---------------------------------------+
+| 0x03    | blue            | uint8_t  | Blue value (0-255).                   |
++---------+-----------------+----------+---------------------------------------+
 
 
 Protocol Revision History

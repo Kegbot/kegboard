@@ -31,6 +31,11 @@
 // Note: Must set KB_ENABLE_ID12_RFID to 0 if enabling this.
 #define KB_ENABLE_WIEGAND_RFID 0
 
+// Enable analog RGB LED control.  Must define 3 PWM pins separately,
+// as KB_PIN_RGB_PWM_{A,B,C}.  Generally only larger boards like Arduino
+// Mega have available pins for this.
+#define KB_ENABLE_RGB_PWM 0
+
 // Enable software debounce? EXPERIMENTAL. Enabling this feature may negatively
 // affect pour accuracy.  In particular, a delay is added to each flow meter
 // ISR, disabling all other interrupts during this time.
@@ -101,7 +106,7 @@
 #define KB_PIN_WIEGAND_RFID_DATA1 A5
 
 // Atmega1280 (aka Arduino mega) section
-#ifdef __AVR_ATmega1280__
+#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
 #define KB_ATMEGA_1280            1
 #define KB_NUM_METERS             6
 
@@ -109,6 +114,10 @@
 #define KB_PIN_METER_D            20
 #define KB_PIN_METER_E            19
 #define KB_PIN_METER_F            18
+
+#define KB_PIN_RGB_PWM_R          44
+#define KB_PIN_RGB_PWM_G          45
+#define KB_PIN_RGB_PWM_B          46
 #else
 #define KB_NUM_METERS             2
 #endif

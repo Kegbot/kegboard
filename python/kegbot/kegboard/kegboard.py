@@ -291,6 +291,11 @@ class SetOutputCommand(Message):
   output_id = Uint8Field(0x01)
   output_mode = OutputField(0x02)
 
+class SetRGBCommand(Message):
+  MESSAGE_ID = 0x85
+  red = Uint8Field(0x01)
+  green = Uint8Field(0x02)
+  blue = Uint8Field(0x03)
 
 MESSAGE_ID_TO_CLASS = {}
 for cls in Message.__subclasses__():

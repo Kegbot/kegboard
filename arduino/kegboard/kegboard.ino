@@ -492,6 +492,12 @@ void setup()
   gLastWiegandInterruptMillis = 0;
 #endif
 
+#if KB_ENABLE_RGB_PWM
+  pinMode(KB_PIN_RGB_PWM_R, OUTPUT);
+  pinMode(KB_PIN_RGB_PWM_G, OUTPUT);
+  pinMode(KB_PIN_RGB_PWM_B, OUTPUT);
+#endif
+
   writeHelloPacket();
 }
 
@@ -889,6 +895,14 @@ void setRelayOutput(uint8_t id, uint8_t mode) {
   writeRelayPacket(id);
 }
 
+#if KB_ENABLE_RGB_PWM
+void setRGBOutput(uint8_t red, uint8_t green, uint8_t blue) {
+   analogWrite(KB_PIN_RGB_PWM_R, red);
+   analogWrite(KB_PIN_RGB_PWM_G, green);
+   analogWrite(KB_PIN_RGB_PWM_B, blue);
+}
+#endif
+
 void handleInputPacket() {
   if (!gPacketStat.have_packet) {
     return;
@@ -916,6 +930,22 @@ void handleInputPacket() {
       }
       break;
     }
+    
+#if KB_ENABLE_RGB_PWM
+    case KBM_SET_RGB: {
+      uint8_t red, green, blue;
+      
+      if (!gInputPacket.ReadTag(KBM_SET_RGB_TAG_RED, &red)
+          || !gInputPacket.ReadTag(KBM_SET_RGB_TAG_GREEN, &green)
+          || !gInputPacket.ReadTag(KBM_SET_RGB_TAG_BLUE, &blue)) {
+        break;
+      }
+      
+      setRGBOutput(red, green, blue);
+       
+      break; 
+    }
+#endif
   }
   resetInputPacket();
 }
