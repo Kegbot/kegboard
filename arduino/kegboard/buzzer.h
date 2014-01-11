@@ -1,24 +1,18 @@
 #ifndef BUZZER_H
 #define BUZZER_H
 
-// Melody note:
-//  1 bit  reserved
-//  3 bits for octave (0-5),
-//  4 bits for note (0-11),
-//  8 bits for duration (0-255),
-#define MELODY_NOTE(octave, note, duration) \
-	(((octave & 0x7) << 12) | ((note & 0xf) << 8) | (duration & 0xff))
+#include "Arduino.h"
 
-#define OCTAVE(melody_note) ((melody_note >> 12) & 0x7)
-#define NOTE(melody_note) ((melody_note >> 8) & 0xf)
-#define DURATION(melody_note) (melody_note & 0xff)
+// Note is:
+//  16 bits for frequency
+//  16 bits for duration
+#define NOTE(frequency, duration) \
+	(((frequency & 0xffffUL) << 16) | (duration & 0xffffUL))
+#define DURATION(note) (note & 0xffffUL)
+#define FREQUENCY(note) ((note >> 16) & 0xffffUL)
+#define SILENT(duration)  NOTE(0, duration)
+#define MELODY_END 0
 
-#define NOTE_SILENCE  0xf
-
-#include <avr/pgmspace.h>
-
-void setupBuzzer();
-void playMidiNote(uint8_t octave, uint8_t note);
-void playMelody(prog_uint16_t* notes);
+void play_notes(uint32_t* notes, int pin);
 
 #endif // BUZZER_H
