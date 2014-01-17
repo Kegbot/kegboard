@@ -47,6 +47,7 @@
 
 #include "kegboard.h"
 #include "kegboard_config.h"
+#include "kegboard_eeprom.h"
 #include "ds1820.h"
 #include "KegboardPacket.h"
 #include "version.h"
@@ -129,6 +130,8 @@ typedef struct {
 } UptimeStat;
 
 static UptimeStat gUptimeStat;
+
+static uint8_t gSerialNumber[SERIAL_NUMBER_SIZE_BYTES];
 
 #if KB_ENABLE_ONEWIRE_PRESENCE
 // Structure used to cache information about devices on the onewire bus.
@@ -288,10 +291,11 @@ void wiegandData1() {
 
 void writeHelloPacket()
 {
-  int foo = FIRMWARE_VERSION;
+  int firmware_version = FIRMWARE_VERSION;
   KegboardPacket packet;
   packet.SetType(KBM_HELLO_ID);
-  packet.AddTag(KBM_HELLO_TAG_FIRMWARE_VERSION, sizeof(foo), (char*)&foo);
+  packet.AddTag(KBM_HELLO_TAG_FIRMWARE_VERSION, sizeof(firmware_version), (char*)&firmware_version);
+  packet.AddTag(KBM_HELLO_TAG_SERIAL_NUMBER, SERIAL_NUMBER_SIZE_BYTES, (char*)gSerialNumber);
   packet.Print();
 }
 
@@ -408,6 +412,11 @@ void setup()
 {
   memset(&gUptimeStat, 0, sizeof(UptimeStat));
   memset(&gPacketStat, 0, sizeof(RxPacketStat));
+  memset(gSerialNumber, 0, SERIAL_NUMBER_SIZE_BYTES);
+
+  if (eeprom_is_valid()) {
+    eeprom_read_serialno(gSerialNumber);
+  }
 
   // Flow meter steup. Enable internal weak pullup to prevent disconnected line
   // from ticking away.
@@ -923,6 +932,24 @@ void handleInputPacket() {
       if (id < KB_NUM_RELAY_OUTPUTS) {
         setRelayOutput(id, mode);
       }
+      break;
+    }
+
+    case KBM_SET_SERIAL_NUMBER: {
+      // Serial number can only be set if not already set.
+      if (eeprom_is_valid()) {
+        break;
+      }
+
+      if (gInputPacket.FindTagLength(KBM_SET_SERIAL_NUMBER_TAG_SERIAL) >= SERIAL_NUMBER_SIZE_BYTES) {
+        break;
+      }
+
+      memset(gSerialNumber, 0, SERIAL_NUMBER_SIZE_BYTES);
+      gInputPacket.CopyTagData(KBM_SET_SERIAL_NUMBER_TAG_SERIAL, gSerialNumber);
+      eeprom_write_serialno(gSerialNumber);
+      writeHelloPacket();
+
       break;
     }
   }

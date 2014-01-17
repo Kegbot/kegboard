@@ -188,8 +188,12 @@ request this message with the :ref:`ping-command`.
 +---------+-----------------+----------+---------------------------------------+
 | Tag ID  | Name            | Type     | Description                           |
 +=========+=================+==========+=======================================+
-| 0x01    | protocol_version| uint16   | Supported version of kegboard         |
+| 0x01    | firmware_version| uint16   | Board firmware version.               |
++---------+-----------------+----------+---------------------------------------+
+| 0x02    | protocol_version| uint16   | Supported version of kegboard         |
 |         |                 |          | serial protocol.                      |
++---------+-----------------+----------+---------------------------------------+
+| 0x03    | serial_number   | string   | Board serial number                   |
 +---------+-----------------+----------+---------------------------------------+
 
 .. _board-configuration-message:
@@ -273,7 +277,7 @@ valves.
 .. _auth-token-message:
 
 ``auth_token`` message (0x14)
------------------------------------
+-----------------------------
 
 When an authentication token is attached or removed from the kegboard, this
 messages is sent.  The ``device_name`` field gives the name of the kegboard
@@ -301,7 +305,7 @@ protocol.
 .. _ping-command:
 
 ``ping`` command (0x81)
-------------------------
+-----------------------
 
 This command is sent to the board to request a :ref:`hello-message`.  This can be
 used to verify that the attached device is a Kegboard that speaks the serial
@@ -310,7 +314,7 @@ protocol.
 There is no payload.
 
 ``set_output`` command (0x84)
-------------------------------------
+-----------------------------
 
 This command is sent to the board to enable or disable a device output.
 
@@ -320,6 +324,17 @@ This command is sent to the board to enable or disable a device output.
 | 0x01    | output_id       | uint8_t  | Numerical output id (0-15).           |
 +---------+-----------------+----------+---------------------------------------+
 | 0x02    | output_mode     | output_t | Mode to set the output.               |
++---------+-----------------+----------+---------------------------------------+
+
+``set_serial_number`` command (0x84)
+------------------------------------
+
+This command sets the board serial number, if not already set.
+
++---------+-----------------+----------+---------------------------------------+
+| Tag ID  | Name            | Type     | Description                           |
++=========+=================+==========+=======================================+
+| 0x01    | serial_number   | string   | Serial number.                        |
 +---------+-----------------+----------+---------------------------------------+
 
 

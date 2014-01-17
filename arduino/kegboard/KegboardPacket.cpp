@@ -61,6 +61,14 @@ void KegboardPacket::AddTag(uint8_t tag, uint8_t buflen, char *buf)
   AppendBytes(buf, buflen);
 }
 
+int KegboardPacket::FindTagLength(uint8_t tagnum) {
+  uint8_t* buf = FindTag(tagnum);
+  if (buf == NULL) {
+    return -1;
+  }
+  return buf[1] & 0xff;
+}
+
 uint8_t* KegboardPacket::FindTag(uint8_t tagnum) {
   uint8_t pos=0;
   while (pos < m_len && pos < KBSP_PAYLOAD_MAXLEN) {
@@ -82,14 +90,14 @@ bool KegboardPacket::ReadTag(uint8_t tagnum, uint8_t *value) {
   return true;
 }
 
-bool KegboardPacket::ReadTag(uint8_t tagnum, uint8_t** value) {
+int KegboardPacket::CopyTagData(uint8_t tagnum, void* dest) {
   uint8_t *offptr = FindTag(tagnum);
   if (offptr == NULL) {
-    return false;
+    return -1;
   }
   uint8_t slen = *(offptr+1);
-  memcpy(*value, (offptr+2), slen);
-  return true;
+  memcpy(dest, (offptr+2), slen);
+  return slen;
 }
 
 void KegboardPacket::AppendBytes(char *buf, int buflen)

@@ -8,9 +8,12 @@ class KegboardPacket {
    void AddTag(uint8_t tag, uint8_t buflen, char *buf);
 
    bool ReadTag(uint8_t tagnum, uint8_t *value);
-   bool ReadTag(uint8_t tagnum, uint8_t **value);
+   int CopyTagData(uint8_t tagnum, void *dest);
 
+   // Returns length of tag's payload, or -1 if not found.
+   int FindTagLength(uint8_t tagnum);
    uint8_t* FindTag(uint8_t tagnum);
+
    void AppendBytes(char *buf, int buflen);
    void Reset();
    bool IsReset();

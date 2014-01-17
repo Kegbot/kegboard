@@ -241,6 +241,8 @@ class Message(util.BaseMessage):
 class HelloMessage(Message):
   MESSAGE_ID = 0x01
   firmware_version = Uint16Field(0x01)
+  protocol_version = Uint16Field(0x02)
+  serial_number = StringField(0x03)
 
 
 class ConfigurationMessage(Message):
@@ -290,6 +292,11 @@ class SetOutputCommand(Message):
   MESSAGE_ID = 0x84
   output_id = Uint8Field(0x01)
   output_mode = OutputField(0x02)
+
+
+class SetSerialNumberCommand(Message):
+  MESSAGE_ID = 0x85
+  serial_number = StringField(0x01)
 
 
 MESSAGE_ID_TO_CLASS = {}
