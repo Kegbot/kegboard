@@ -6,6 +6,10 @@ Changelog
 Arduino Firmware
 -----------------
 
+v15 (2014-01-16)
+^^^^^^^^^^^^^^^^
+* Added `set_serial_number` command.
+
 v14 (2013-07-23)
 ^^^^^^^^^^^^^^^^
 * Flow LEDs are now toggled on system startup and during pours.
