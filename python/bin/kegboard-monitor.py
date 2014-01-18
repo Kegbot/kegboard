@@ -36,22 +36,30 @@ FLAGS = gflags.FLAGS
 
 class KegboardMonitorApp(app.App):
 
-  def _SetupSerial(self):
-    self._logger.info('Setting up serial port...')
-    self._serial_fd = serial.Serial(FLAGS.kegboard_device, FLAGS.kegboard_speed)
-    self._reader = kegboard.KegboardReader(self._serial_fd)
+  def _SetupSignalHandlers(self):
+    # Don't install signal handlers, so we actually receive
+    # KeyboardInterrupt.
+    pass
 
   def _MainLoop(self):
-    self._SetupSerial()
-    self._logger.info('Starting reader loop...')
-    ping_message = kegboard.PingCommand()
-    self._serial_fd.write(ping_message.ToBytes())
-    while not self._do_quit:
-      msg = self._reader.GetNextMessage()
-      print msg
-    self._serial_fd.close()
-    self._logger.info('Reader loop ended.')
+    try:
+      while True:
+        print 'Waiting for a kegboard ...'
+        board = kegboard.wait_for_kegboard()
+        print 'Found: %s' % board
+        print 'Listening to board ...'
 
+        board.open()
+        try:
+          while True:
+            print board.read_message()
+        except IOError, e:
+          print 'Error, closing board: %s' % e
+          print ''
+        finally:
+          board.close_quietly()
+    except KeyboardInterrupt:
+      return
 
 if __name__ == '__main__':
   KegboardMonitorApp.BuildAndRun()
