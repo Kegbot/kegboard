@@ -18,9 +18,10 @@
  * along with Kegbot.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Arduino.h"
-#include "kegboard_eeprom.h"
+#include <Arduino.h>
 #include <EEPROM.h>
+
+#include "kegboard_eeprom.h"
 
 int eeprom_is_valid() {
   return EEPROM.read(0) == (EEP_MAGIC >> 8) && 

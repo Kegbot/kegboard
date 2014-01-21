@@ -44,6 +44,7 @@
 #include <string.h>
 #include <util/crc16.h>
 #include <util/delay.h>
+#include <EEPROM.h>
 
 #include "kegboard.h"
 #include "kegboard_config.h"
