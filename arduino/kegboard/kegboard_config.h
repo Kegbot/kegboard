@@ -39,6 +39,9 @@
 // Approximate minimum pulse width required for incoming external interrupts.
 #define KB_SOFT_DEBOUNCE_MICROS 1200
 
+// Enable chip LED?
+#define KB_ENABLE_CHIP_LED 0
+
 //
 // Pin configuration - KEGBOARD VERSION
 //
@@ -80,7 +83,7 @@
 #define KB_PIN_SERIAL_RFID_RX     6
 #define KB_PIN_ONEWIRE_THERMO     7
 #define KB_PIN_ONEWIRE_PRESENCE   8
-#define KB_PIN_GPIO_C             9
+#define KB_PIN_LED_CHIP           9
 #define KB_PIN_RFID_RESET         10
 #define KB_PIN_BUZZER             11
 #define KB_PIN_TEST_PULSE         12

@@ -132,6 +132,10 @@ typedef struct {
 
 static UptimeStat gUptimeStat;
 
+#if KB_ENABLE_CHIP_LED
+static int gChipLedBrightness = 0xff;
+#endif
+
 static uint8_t gSerialNumber[SERIAL_NUMBER_SIZE_BYTES];
 
 #if KB_ENABLE_ONEWIRE_PRESENCE
@@ -386,6 +390,22 @@ void doTestPulse()
 }
 #endif
 
+#if KB_ENABLE_CHIP_LED
+void pulseChipLed() {
+  // Pulse fast when serial is connected, slow otherwise.
+  int rate = Serial ? 8 : 2;
+  if (gChipLedBrightness >= 0) {
+    analogWrite(KB_PIN_LED_CHIP, gChipLedBrightness);
+  } else {
+    analogWrite(KB_PIN_LED_CHIP, 0);
+  }
+  gChipLedBrightness -= rate;
+  if (gChipLedBrightness < -32) {
+    gChipLedBrightness = 0xff;
+  }
+}
+#endif
+
 //
 // Main
 //
@@ -399,6 +419,11 @@ void setup()
   if (eeprom_is_valid()) {
     eeprom_read_serialno(gSerialNumber);
   }
+
+#if KB_ENABLE_CHIP_LED
+   pinMode(KB_PIN_LED_CHIP, OUTPUT);
+   digitalWrite(KB_PIN_LED_CHIP, HIGH);
+#endif
 
   // Flow meter steup. Enable internal weak pullup to prevent disconnected line
   // from ticking away.
@@ -982,6 +1007,10 @@ void stepRelayWatchdog() {
 void loop()
 {
   updateTimekeeping();
+
+#if KB_ENABLE_CHIP_LED
+  pulseChipLed();
+#endif
 
   readIncomingSerialData();
   handleInputPacket();
