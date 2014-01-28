@@ -33,6 +33,7 @@ def setup_package():
         'distribute_setup.py',
         'bin/kegboard-monitor.py',
         'bin/kegboard-tester.py',
+        'bin/kegboard-info.py',
       ],
       install_requires = [
         'kegbot-pyutils >= 0.1.2',

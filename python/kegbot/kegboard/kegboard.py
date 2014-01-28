@@ -31,16 +31,16 @@ import serial
 from . import crc16
 from .message import *
 
-GLOB_PATHS = (
+DEFAULT_GLOB_PATHS = (
   '/dev/ttyUSB*',
   '/dev/ttyACM*',
   '/dev/cu.usbserial*',
   '/dev/tty.usbmodem*'
 )
 
-def find_devices():
+def find_devices(glob_paths=DEFAULT_GLOB_PATHS):
   paths = []
-  for p in GLOB_PATHS:
+  for p in glob_paths:
     paths += glob.glob(p)
   return paths
 
@@ -65,7 +65,6 @@ gflags.DEFINE_boolean('verbose', os.environ.get('VERBOSE') is not None,
     allow_override=True)
 
 
-
 class KegboardError(Exception):
   """Generic error with Kegboard"""
 
@@ -74,7 +73,19 @@ class UnknownMessageError(KegboardError):
   """Message id is not known"""
 
 
-def wait_for_kegboard(interval=0.1, timeout=None):
+def get_kegboard(glob_paths=None):
+  """Immediately returns a Kegboard if available, None otherwise.
+
+  Args:
+    glob_paths: Paths to test for a valid kegboard.
+  """
+  return wait_for_kegboard(timeout=0, glob_paths=glob_paths)
+
+
+def wait_for_kegboard(interval=0.1, timeout=None, glob_paths=None):
+  if not glob_paths:
+    glob_paths = DEFAULT_GLOB_PATHS
+
   elapsed = 0
   while True:
     paths = find_devices()
@@ -210,6 +221,20 @@ class Kegboard:
     """Send a message to the device."""
     self._assert_open()
     return self.fd.write(message.ToBytes())
+
+  def ping(self):
+    return self.write_message(PingCommand())
+
+  def set_serial_number(self, serial_number):
+    command = SetSerialNumberCommand()
+    command.SetValue('serial_number', serial_number)
+    return self.write_message(command)
+
+  def set_output(self, output_id, enable):
+    command = SetOutputCommand()
+    command.SetValue('output_id', int(output_id))
+    command.SetValue('output_mode', int(enable))
+    return self.write_message(command)
 
   def _assert_open(self):
     if not self.fd:
