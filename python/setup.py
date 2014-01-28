@@ -10,7 +10,7 @@ DOCLINES = __doc__.split('\n')
 # Change this to True to include optional dependencies
 USE_OPTIONAL = False
 
-VERSION = '1.1.0'
+VERSION = '1.1.1'
 SHORT_DESCRIPTION = DOCLINES[0]
 LONG_DESCRIPTION = '\n'.join(DOCLINES[2:])
 
