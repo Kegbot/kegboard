@@ -326,22 +326,22 @@ void writeMeterPacket(int channel)
 
   switch (channel) {
     case 0:
+#if BOARD_KBPM
+      RXLED1;
+#else
       digitalWrite(KB_PIN_LED_FLOW_A, HIGH);
+#endif
       break;
     case 1:
+#if BOARD_KBPM
+      TXLED1;
+#else
       digitalWrite(KB_PIN_LED_FLOW_B, HIGH);
+#endif
       break;
     default:
       break;
   }
-
-#if KB_ENABLE_CHIP_LED
-  if (!Serial) {
-    RXLED1;
-    TXLED1;
-    return;
-  }
-#endif
 
   name[4] = 0x30 + channel;
   KegboardPacket packet;
@@ -1019,6 +1019,13 @@ void loop()
 
   digitalWrite(KB_PIN_LED_FLOW_A, LOW);
   digitalWrite(KB_PIN_LED_FLOW_B, LOW);
+
+#if BOARD_KBPM
+  if (!Serial) {
+    RXLED0;
+    TXLED0;
+  }
+#endif
 }
 
 // vim: syntax=c
