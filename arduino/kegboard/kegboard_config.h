@@ -39,6 +39,17 @@
 // Enable chip LED?
 #define KB_ENABLE_CHIP_LED 0
 
+#if BOARD_KBPM
+#undef KB_ENABLE_BUZZER
+#undef KB_ENABLE_ID12_RFID
+#undef KB_ENABLE_CHIP_LED
+#undef KB_ENABLE_SELFTEST
+#define KB_ENABLE_BUZZER 0
+#define KB_ENABLE_ID12_RFID 0
+#define KB_ENABLE_CHIP_LED 1
+#define KB_ENABLE_SELFTEST 0
+#endif
+
 //
 // Pin configuration - KEGBOARD VERSION
 //
