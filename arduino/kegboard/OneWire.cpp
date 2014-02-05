@@ -237,9 +237,6 @@ void OneWire::reset_search()
 uint8_t OneWire::search(uint8_t *newAddr)
 {
   uint8_t i;
-  char lastJunction = -1;
-  uint8_t done = 1;
-  uint8_t result = 0;
 
   if (searchExhausted) {
     return 0;

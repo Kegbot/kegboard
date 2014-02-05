@@ -104,6 +104,8 @@ void PCdetachInterrupt(uint8_t pin) {
   }
 }
 
+#if KB_ENABLE_WIEGAND_RFID
+
 // common code for isr handler. "port" is the PCINT number.
 // there isn't really a good way to back-map ports and masks to pins.
 static void PCint(uint8_t port) {
@@ -138,7 +140,6 @@ static void PCint(uint8_t port) {
   PCintLast[port] = curr;
 }
 
-#if KB_ENABLE_WIEGAND_RFID
 SIGNAL(PCINT0_vect) {
   PCint(0);
 }

@@ -58,7 +58,7 @@
 #define KBSP_PAYLOAD_MAXLEN 112
 
 // Milliseconds/day
-#define MS_PER_DAY  (1000*60*60*24)
+#define MS_PER_DAY  86400000UL
 // Interval between test pulse trains
 #define KB_SELFTEST_INTERVAL_MS 500
 

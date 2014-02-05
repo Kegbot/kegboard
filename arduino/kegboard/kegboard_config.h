@@ -24,9 +24,6 @@
 // Enable ID-12 RFID?
 #define KB_ENABLE_ID12_RFID 1
 
-// Enable MagStripe reader?
-#define KB_ENABLE_MAGSTRIPE 0
-
 // Enable Wiegand RFID reader?
 // Note: Must set KB_ENABLE_ID12_RFID to 0 if enabling this.
 #define KB_ENABLE_WIEGAND_RFID 0

@@ -399,17 +399,17 @@ $(TARGET).elf: $(ARDUINOLIB) $(OBJECTS)
 %.o: %.c .dep
 	echo "Build $@"
 	mkdir -p .dep/$(dir $<)
-	$(COMPILE.c) $(CPPDEPFLAGS) -o $@ $<
+	$(COMPILE.c) $(CPPDEPFLAGS) -Werror -o $@ $<
 
 %.o: %.cpp .dep
 	echo "Build $@"
 	mkdir -p .dep/$(dir $<)
-	$(COMPILE.cpp) $(CPPDEPFLAGS) -o $@ $<
+	$(COMPILE.cpp) $(CPPDEPFLAGS) -Werror -o $@ $<
 
 %.o: %.cc .dep
 	echo "Build $@"
 	mkdir -p .dep/$(dir $<)
-	$(COMPILE.cpp) $(CPPDEPFLAGS) -o $@ $<
+	$(COMPILE.cpp) $(CPPDEPFLAGS) -Werror -o $@ $<
 
 %.o: %.C .dep
 	echo "Build $@"
@@ -419,7 +419,7 @@ $(TARGET).elf: $(ARDUINOLIB) $(OBJECTS)
 %.o: %.ino .dep
 	echo "Build $@ ino"; echo `pwd`
 	mkdir -p .dep/$(dir $<)
-	$(COMPILE.cpp) $(CPPDEPFLAGS) -o $@ $(CPPINOFLAGS) $<
+	$(COMPILE.cpp) $(CPPDEPFLAGS) -Werror -o $@ $(CPPINOFLAGS) $<
 
 %.o: %.pde .dep
 	echo "Build $@ pde"

@@ -77,11 +77,6 @@ int gRfidPos = -1;
 unsigned char gRfidBuf[RFID_PARALLAX_LEGACY_PAYLOAD_CHARS];
 #endif
 
-#if KB_ENABLE_MAGSTRIPE
-#include "MagStripe.h"
-#include "PCInterrupt.h"
-#endif
-
 #if KB_ENABLE_WIEGAND_RFID
 #include "Wiegand.h"
 #include "PCInterrupt.h"
@@ -188,10 +183,6 @@ static DS1820Sensor gThermoSensor;
 static OneWire gOnewireIdBus(KB_PIN_ONEWIRE_PRESENCE);
 #endif
 
-#if KB_ENABLE_MAGSTRIPE
-static MagStripe gMagStripe(KB_PIN_MAGSTRIPE_CLOCK, KB_PIN_MAGSTRIPE_DATA, KB_PIN_MAGSTRIPE_CARD_PRESENT);
-#endif
-
 #if KB_ENABLE_WIEGAND_RFID
 #define WIEGAND_TIMEOUT_MILLIS 200
 static Wiegand gWiegand;
@@ -250,13 +241,6 @@ void meterInterruptE()
 void meterInterruptF()
 {
   CHECK_METER(KB_PIN_METER_F, 1);
-}
-#endif
-
-#if KB_ENABLE_MAGSTRIPE
-void magStripeClockInterrupt()
-{
-  gMagStripe.clockData();
 }
 #endif
 
@@ -350,6 +334,14 @@ void writeMeterPacket(int channel)
     default:
       break;
   }
+
+#if KB_ENABLE_CHIP_LED
+  if (!Serial) {
+    RXLED1;
+    TXLED1;
+    return;
+  }
+#endif
 
   name[4] = 0x30 + channel;
   KegboardPacket packet;
@@ -470,7 +462,7 @@ void setup()
   pinMode(KB_PIN_ALARM, OUTPUT);
   pinMode(KB_PIN_TEST_PULSE, OUTPUT);
 
-  Serial.begin(115200);
+  Serial.begin((uint16_t) 115200);
 
   digitalWrite(KB_PIN_LED_FLOW_A, HIGH);
   digitalWrite(KB_PIN_LED_FLOW_B, HIGH);
@@ -493,10 +485,6 @@ void setup()
   gSerialRfid.begin(9600);
   pinMode(KB_PIN_SERIAL_RFID_RX, INPUT);
   pinMode(KB_PIN_SERIAL_RFID_TX, OUTPUT);
-#endif
-
-#if KB_ENABLE_MAGSTRIPE
-  PCattachInterrupt(KB_PIN_MAGSTRIPE_CLOCK, magStripeClockInterrupt, FALLING);
 #endif
 
 #if KB_ENABLE_WIEGAND_RFID
@@ -586,7 +574,7 @@ void stepOnewireIdBus() {
       entry->present_count -= 1;
       if (entry->present_count == 0) {
         entry->valid = false;
-        writeAuthPacket("onewire", (uint8_t*)&(entry->id), 8, 0);
+        writeAuthPacket((char*) "onewire", (uint8_t*)&(entry->id), 8, 0);
       }
     }
     return;
@@ -623,7 +611,7 @@ void stepOnewireIdBus() {
       entry->valid = true;
       entry->present_count = ONEWIRE_CACHE_MAX_MISSING_SEARCHES;
       entry->id = addr;
-      writeAuthPacket("onewire", (uint8_t*)&(entry->id), 8, 1);
+      writeAuthPacket((char*) "onewire", (uint8_t*)&(entry->id), 8, 1);
       return;
     }
   }
@@ -765,19 +753,6 @@ static void doProcessRfid() {
   } else {
       doProcessParallaxRfid();
   }
-}
-#endif
-
-#if KB_ENABLE_MAGSTRIPE
-void doProcessMagStripe()
-{
-  // Return if there is no data
-  uint8_t* data;
-  int dataSize = gMagStripe.getData(&data);
-  if (dataSize <= 0) return;
-
-  writeAuthPacket("magstripe", data, dataSize, 1);
-  writeAuthPacket("magstripe", data, dataSize, 0);
 }
 #endif
 
@@ -1032,10 +1007,6 @@ void loop()
 
 #if KB_ENABLE_PARALLAX_RFID
   doProcessRfid();
-#endif
-
-#if KB_ENABLE_MAGSTRIPE
-  doProcessMagStripe();
 #endif
 
 #if KB_ENABLE_WIEGAND_RFID

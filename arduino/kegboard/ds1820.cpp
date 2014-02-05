@@ -67,8 +67,6 @@ bool DS1820Sensor::Update(unsigned long clock)
     m_conversion_start_clock = 0;
   }
 
-  unsigned long delta = clock - m_conversion_start_clock;
-
   if (!m_converting) {
     // we're not converting, and it is time to start
     m_converting = true;

@@ -1,6 +1,8 @@
+#include <limits.h>
+
 #define ONEWIRE_FAMILY_DS18B20  0x28
 #define ONEWIRE_FAMILY_DS18S20  0x10
-#define INVALID_TEMPERATURE_VALUE 0x7fffffff
+#define INVALID_TEMPERATURE_VALUE INT_MIN
 
 class OneWire;
 
