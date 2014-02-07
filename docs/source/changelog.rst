@@ -6,6 +6,10 @@ Changelog
 Arduino Firmware
 -----------------
 
+v16 (2014-02-07)
+^^^^^^^^^^^^^^^^
+* Added chip LED support for Kegboard Pro Mini.
+
 v15 (2014-01-16)
 ^^^^^^^^^^^^^^^^
 * Added `set_serial_number` command.
