@@ -30,6 +30,7 @@ import serial
 
 from . import crc16
 from .message import *
+from .exceptions import *
 
 DEFAULT_GLOB_PATHS = (
   '/dev/ttyUSB*',
@@ -63,14 +64,6 @@ gflags.DEFINE_integer('kegboard_speed', 115200,
 gflags.DEFINE_boolean('verbose', os.environ.get('VERBOSE') is not None,
     'Generate extra logging information.',
     allow_override=True)
-
-
-class KegboardError(Exception):
-  """Generic error with Kegboard"""
-
-
-class UnknownMessageError(KegboardError):
-  """Message id is not known"""
 
 
 def get_kegboard(glob_paths=None):
@@ -135,7 +128,7 @@ class Kegboard:
       pass
 
   def read_message_nonblock(self):
-    """Immedaitely returns a message if available, None otherwise."""
+    """Immediately returns a message if available, None otherwise."""
     self._assert_open()
 
     while True:

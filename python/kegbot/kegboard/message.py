@@ -20,6 +20,8 @@ import cStringIO
 import struct
 
 from kegbot.util import util
+
+from .exceptions import *
 from . import crc16
 
 
