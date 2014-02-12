@@ -6,6 +6,10 @@ Changelog
 Arduino Firmware
 -----------------
 
+v17 (2014-02-12)
+^^^^^^^^^^^^^^^^
+* Fixed a bug that broke serial communication (introduced in v16).
+
 v16 (2014-02-07)
 ^^^^^^^^^^^^^^^^
 * Added chip LED support for Kegboard Pro Mini.
