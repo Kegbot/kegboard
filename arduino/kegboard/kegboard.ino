@@ -351,7 +351,7 @@ void writeMeterPacket(int channel)
   packet.Print();
 }
 
-void writeAuthPacket(char* device_name, uint8_t* token, int token_len,
+void writeAuthPacket(const char* device_name, uint8_t* token, int token_len,
     char status) {
   KegboardPacket packet;
   packet.SetType(KBM_AUTH_TOKEN);
@@ -462,7 +462,7 @@ void setup()
   pinMode(KB_PIN_ALARM, OUTPUT);
   pinMode(KB_PIN_TEST_PULSE, OUTPUT);
 
-  Serial.begin((uint16_t) 115200);
+  Serial.begin(115200);
 
   digitalWrite(KB_PIN_LED_FLOW_A, HIGH);
   digitalWrite(KB_PIN_LED_FLOW_B, HIGH);
@@ -574,7 +574,7 @@ void stepOnewireIdBus() {
       entry->present_count -= 1;
       if (entry->present_count == 0) {
         entry->valid = false;
-        writeAuthPacket((char*) "onewire", (uint8_t*)&(entry->id), 8, 0);
+        writeAuthPacket("onewire", (uint8_t*)&(entry->id), 8, 0);
       }
     }
     return;
@@ -611,7 +611,7 @@ void stepOnewireIdBus() {
       entry->valid = true;
       entry->present_count = ONEWIRE_CACHE_MAX_MISSING_SEARCHES;
       entry->id = addr;
-      writeAuthPacket((char*) "onewire", (uint8_t*)&(entry->id), 8, 1);
+      writeAuthPacket("onewire", (uint8_t*)&(entry->id), 8, 1);
       return;
     }
   }
@@ -673,7 +673,7 @@ static void doProcessRfid() {
   if (gRfidPos == RFID_PAYLOAD_CHARS) {
     if (gRfidChecksum == 0) {
       writeAuthPacket("core.rfid", gRfidBuf+1, 5, 1);
-      writeAuthPacket("core.rfid", gRfidBuf+1, 5, 0);
+      writeAuthPacket("core.rfid",  gRfidBuf+1, 5, 0);
     }
   }
 

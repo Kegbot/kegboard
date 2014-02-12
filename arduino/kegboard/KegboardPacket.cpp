@@ -53,7 +53,7 @@ void KegboardPacket::Reset()
   m_type = 0;
 }
 
-void KegboardPacket::AddTag(uint8_t tag, uint8_t buflen, char *buf)
+void KegboardPacket::AddTag(uint8_t tag, uint8_t buflen, const char *buf)
 {
   m_payload[m_len++] = tag;
   m_payload[m_len++] = buflen;
@@ -99,7 +99,7 @@ int KegboardPacket::CopyTagData(uint8_t tagnum, void* dest) {
   return slen;
 }
 
-void KegboardPacket::AppendBytes(char *buf, int buflen)
+void KegboardPacket::AppendBytes(const char *buf, int buflen)
 {
   int i=0;
   while (i < buflen && m_len < KBSP_PAYLOAD_MAXLEN) {
