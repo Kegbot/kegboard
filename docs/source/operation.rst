@@ -24,7 +24,7 @@ Flow sensing
 ------------
 
 Each flow meter is connected to one of the Arduino's external interrupt pins.
-On a normal Arduino, these are pins 2 and 3.
+(On an Arduino, these are digital pins 2 and 3.)
 
 Kegboard supports "open collector" flow meters.  These meters are typically
 built using hall effect sensors.  As liquid passes through the meter, a series
@@ -76,7 +76,7 @@ tunes.
 +----------------------+-------------------------------------------------------+
 | Event                | Sound                                                 |
 +======================+=======================================================+
-| Board power up       | Short musical tune (10 notes).                        |
+| Board power up       | Short musical tune (4 notes).                         |
 +----------------------+-------------------------------------------------------+
 | Auth Token Added     | Three-tone "added" sound.                             |
 +----------------------+-------------------------------------------------------+

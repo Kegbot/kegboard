@@ -1,6 +1,9 @@
-=================
-Kegboard Firmware
-=================
+==============================
+Building and Flashing Firmware
+==============================
+
+This section describes how to build and flash the Kegboard firmware on a
+standard Arduino device.
 
 Install Arduino software
 ========================
@@ -24,6 +27,7 @@ will be different for previous versions.)
 Place this directory somewhere appropriate. For Mac users, you can drag it to
 your Applications folder.
 
+
 Compile and flash the firmware
 ==============================
 
@@ -38,8 +42,8 @@ you're most of the way there
 The latest version of the Kegboard firmware is available in the **kegboard**
 distribution, under the directory ``src/kegboard/``.
 
-You can also download the entire kegboard github repository as a zip file:
-`Download kegboard repository <https://github.com/Kegbot/kegboard/zipball/master>`_.
+You can also download the entire Kegboard github repository as a zip file:
+`Download Kegboard repository <https://github.com/Kegbot/kegboard/zipball/master>`_.
 
 The file ``kegboard.ino`` is the main source to the firmware. This file is a
 C source file, using the file extension preferred by the Arduino development
@@ -71,24 +75,6 @@ firmware will be uploaded to you device.
 Depending on your hardware, it may be necessary to reset the board using the
 reset pushbutton when starting the upload.
 
-
-Test the Kegboard
-=================
-
-Two command-line progams were installed as part of
-:ref:`install-kegboard-library`.  Both programs support various flags; see
-**--help**.
-
-kegboard-monitor.py
--------------------
-
-This program monitors the serial port given with the command line flag
-**--kegboard_device**, printing any Kegboard packets it sees.
-
-kegboard-tester.py
-------------------
-
-This program cycles through each relay on the Kegboard, opening and closing it.
 
 Test pin
 --------

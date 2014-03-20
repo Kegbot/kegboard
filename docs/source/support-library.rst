@@ -1,7 +1,7 @@
 .. _install-kegboard-library:
 
-Install Support Library
-=======================
+Kegboard Support Library
+========================
 
 In addition to the Kegboard firmware, the Kegboard package comes with some
 support optional tools (``kegboard-monitor`` and ``kegboard-tester``) as well as
@@ -109,3 +109,21 @@ section.
 	(kegboard) $ ./setup.py develop
 
 The command may take a few minutes as it downloads and installs everything.
+
+Testing a Kegboard
+-------------------
+
+The support library includes two small programs which you can use against a
+connected Kegboard.
+
+kegboard-monitor.py
+^^^^^^^^^^^^^^^^^^^
+
+This program monitors your system's serial ports for a Kegboard, displaying
+information about each one it detects.
+
+kegboard-tester.py
+^^^^^^^^^^^^^^^^^^
+
+This program cycles through each relay on the Kegboard (when available),
+opening and closing it.

@@ -7,28 +7,31 @@ This page describes *Kegboard*, the Arduino-based controller board for Kegbot.
 What is a Kegboard?
 ===================
 
-Kegboard is the most important device in a Kegbot system.  Kegboard is the
-device that monitors all sensors, including the flow sensors that are essential
-in any Kegbot configuration.
+*Kegboard* is the name we use for the microcontroller board used in a Kegbot
+system.  Kegboard is the device that monitors all sensors, including the flow
+sensors that are essential in any Kegbot configuration.
 
-Kegboard is based on and designed around Arduino.  Program an Arduino with our
-firmware and attach your sensors to it, and you'll have a Kegboard!
+There are two commonly-used Kegboard targets:
 
-Though not required, the Kegbot Project also provides schematics for a "shield"
-board that you can attach to the Arduino.  The Kegboard Shield makes it a breeze
-to wire up sensors on a new Kegboard.  For more information, see
-http://kegbot.org/kegboard/.
+* `Kegboard Pro Mini <https://kegbot.org/kbpm>`_, a fully-assembled board,
+  introduced in early 2014 and sold at the `Kegbot Store <http://store.kegbot.org>`_.
+* `DIY Arduino Kegboard <https://kegbot.org/kegboard-diy>`_, a do-it-yourself
+  option that can be built using an `Arduino <http://arduino.cc>`_
+  board.
+
+The Kegboard software package includes firmware and support libraries that
+work with either kind of Kegboard.
 
 Features
 ========
 
-Over the years, we've noticed different Kegbotters want different features in
-their systems.  The Kegbot firmware is designed for this flexibility: We try to
-support as many features and add-on devices as possible in the core firmware,
-while still keeping basic functionality tight and fast for the most common
-configurations. 
+Since not all Kegbots are alike, the Kegbot firmware is designed with
+flexibility in mind: We try to support many features and add-on devices in the
+core firmware, while still keeping basic functionality tight and fast for the
+common configurations.
 
-Standard features of Kegboard on Arduino:
+Depending on hardware, the Kegboard firmware can support the following
+features:
 
 * **Flow Sensing:** Two independent flow meter inputs (or 6 on Arduino Mega),
   allowing you to monitor that many individual beer taps with just one board.
@@ -49,6 +52,11 @@ Standard features of Kegboard on Arduino:
   simple and extensible serial protocol in your system.  (See
   :ref:`kegboard-serial-protocol`).
 
-All features are optional:  Kegboard's firmware will operate correctly even if
-you exclude parts for a certain feature, so you can save on cost by only
-building what you want.
+.. note::
+  
+  Because of its limited size, certain features (such as relay control and
+  RFID reading) are not available on Kegboard Pro Mini.
+
+Kegboard's firmware is designed to operate correctly even when a feature is
+not being used.  For example, if the temperature sensor input is not
+connected, other features will continue to operate normally.

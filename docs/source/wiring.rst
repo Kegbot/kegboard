@@ -1,16 +1,12 @@
 .. _wiring-chapter:
 
-====================
-Wiring Up a Kegboard
-====================
+Pin Mapping
+===========
 
 .. _pin-connections:
 
-Kegboard Pinout
-===============
-
-The following table describes the pins available on the Arduino board, and their
-purpose in the Kegboard firmware.
+The following table describes the pins available on a standard Arduino board,
+and their purpose in the Kegboard firmware.
 
 +--------------+----------------------------------------------------------+
 | Pin          | Description                                              |

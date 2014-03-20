@@ -1,19 +1,22 @@
 .. _kegboard-guide:
 
-Kegboard Guide
-==============
+Kegboard Firmware Manual
+========================
 
-This document describes how to program and hack on Kegboard, our Arduino-based
-beer keg controller.  For information about assembling a Kegboard, please see
-the companion `Kegboard Build Guide <http://kegbot.org/docs/kegboard-build/>`_.
+This document describes how to program and hack on a Kegboard, our
+Arduino-based keg controller board.
+
+Kegboard software works with the
+`Kegboard Pro Mini <https://kegbot.org/kbpm>`_, and can also be used
+with a `do-it-yourself Arduino Kegboard <https://kegbot.org/kegboard-diy>`_.
 
 .. toctree::
    :maxdepth: 2
 
    overview
    operation
-   install-tools
-   firmware
    wiring
+   firmware
+   support-library
    serial-protocol
    changelog
