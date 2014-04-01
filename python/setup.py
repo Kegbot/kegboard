@@ -34,6 +34,7 @@ def setup_package():
         'bin/kegboard-monitor.py',
         'bin/kegboard-tester.py',
         'bin/kegboard-info.py',
+        'bin/set-kegboard-serialnumber',
       ],
       install_requires = [
         'kegbot-pyutils >= 0.1.2',

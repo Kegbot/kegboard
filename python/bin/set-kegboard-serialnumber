@@ -1,0 +1,79 @@
+#!/usr/bin/env python
+#
+# Copyright 2014 Mike Wakerly <opensource@hoho.com>
+#
+# This file is part of the Kegboard package of the Kegbot project.
+# For more information on Kegboard or Kegbot, see http://kegbot.org/
+#
+# Kegboard is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License, or
+# (at your option) any later version.
+#
+# Kegboard is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Kegboard.  If not, see <http://www.gnu.org/licenses/>.
+
+"""Waits for a Kegboard and sets its serial number."""
+
+import random
+import sys
+
+from kegbot.util import app
+from kegbot.kegboard import kegboard
+
+class KegboardMonitorApp(app.App):
+
+  def _SetupSignals(self):
+    pass
+
+  def _wait_for_response(self, board):
+    msg = None
+    for i in xrange(4):
+      board.ping()
+      msg = board.read_message(timeout=3)
+      if isinstance(msg, kegboard.HelloMessage):
+        break
+
+    if not msg:
+      print 'Gave up pinging kegboard!'
+      sys.exit(1)
+
+    print '%s: firmware_version=%s serial_number=%s' % (board, msg.firmware_version,
+        msg.serial_number)
+    print ''
+    return msg
+
+  def _MainLoop(self):
+    self._logger.debug('Waiting for kegboard ...')
+    board = kegboard.get_kegboard()
+    if not board:
+      print 'No kegboard found.'
+      sys.exit(1)
+    board.open()
+    self._logger.debug('Got kegboard: %s' % board)
+
+    pkt = self._wait_for_response(board)
+
+    if pkt.serial_number:
+      print 'Board already has a serial number.'
+      sys.exit(1)
+
+    msg = 'Set board serial number?'
+    proceed = True if raw_input("%s (y/N) " % msg).lower() == 'y' else False
+
+    if not proceed:
+      print 'Aborting!'
+      sys.exit(1)
+
+    serial_number = 'KB-0000-0000-%08x' % random.getrandbits(32)
+    board.set_serial_number(serial_number)
+    self._wait_for_response(board)
+
+
+if __name__ == '__main__':
+  KegboardMonitorApp.BuildAndRun()
