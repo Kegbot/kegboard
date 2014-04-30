@@ -42,9 +42,9 @@ class KegboardMonitorApp(app.App):
     msg = None
     for i in xrange(4):
       board.ping()
-      msg = board.read_message(timeout=3)
-      if isinstance(msg, kegboard.HelloMessage):
-        break
+      candidate = board.read_message(timeout=3)
+      if isinstance(candidate, kegboard.HelloMessage):
+        msg = candidate
 
     if not msg:
       print 'Gave up pinging kegboard!'
