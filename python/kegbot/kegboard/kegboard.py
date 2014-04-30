@@ -210,6 +210,15 @@ class Kegboard:
         return None
       time.sleep(interval)
 
+  def wait_for_ping(self, attempts=5):
+    self.drain_messages()
+    for i in xrange(attempts):
+      self.ping()
+      messages = [self.read_message(timeout=1)] + self.drain_messages()
+      for message in messages:
+        if isinstance(message, HelloMessage):
+          return message
+
   def write_message(self, message):
     """Send a message to the device."""
     self._assert_open()

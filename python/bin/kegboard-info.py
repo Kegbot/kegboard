@@ -39,13 +39,7 @@ class KegboardMonitorApp(app.App):
     board.open()
     self._logger.debug('Got kegboard: %s' % board)
 
-    msg = None
-    for i in xrange(4):
-      board.ping()
-      candidate = board.read_message(timeout=3)
-      if isinstance(candidate, kegboard.HelloMessage):
-        msg = candidate
-
+    msg = board.wait_for_ping()
     if not msg:
       print 'Gave up pinging kegboard!'
       sys.exit(1)
