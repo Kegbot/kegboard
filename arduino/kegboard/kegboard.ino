@@ -120,10 +120,10 @@ static RelayOutputStat gRelayStatus[KB_NUM_RELAY_OUTPUTS];
 // Structure to keep information about this device's uptime. 
 typedef struct {
   unsigned long uptime_ms;
+  unsigned long uptime_days;
   unsigned long last_uptime_ms;
   unsigned long last_meter_event;
   unsigned long last_heartbeat;
-  int uptime_days;
 } UptimeStat;
 
 static UptimeStat gUptimeStat;
@@ -267,6 +267,8 @@ void writeHelloPacket()
   packet.SetType(KBM_HELLO_ID);
   packet.AddTag(KBM_HELLO_TAG_FIRMWARE_VERSION, sizeof(firmware_version), (char*)&firmware_version);
   packet.AddTag(KBM_HELLO_TAG_SERIAL_NUMBER, SERIAL_NUMBER_SIZE_BYTES, (char*)gSerialNumber);
+  packet.AddTag(KBM_HELLO_TAG_UPTIME_MILLIS, sizeof(gUptimeStat.uptime_ms), (char*)&gUptimeStat.uptime_ms);
+  packet.AddTag(KBM_HELLO_TAG_UPTIME_DAYS, sizeof(gUptimeStat.uptime_days), (char*)&gUptimeStat.uptime_days);
   packet.Print();
 }
 
@@ -520,7 +522,7 @@ void updateTimekeeping() {
     gUptimeStat.uptime_ms -= MS_PER_DAY;
   }
 
-  if ((now - gUptimeStat.last_meter_event) > KB_HEARTBEAT_INTERVAL_MS) {
+  if ((now - gUptimeStat.last_heartbeat) > KB_HEARTBEAT_INTERVAL_MS) {
     gUptimeStat.last_heartbeat = now;
     writeHelloPacket();
   }

@@ -192,6 +192,8 @@ class HelloMessage(Message):
   firmware_version = Uint16Field(0x01)
   protocol_version = Uint16Field(0x02)
   serial_number = StringField(0x03)
+  uptime_millis = Uint32Field(0x04)
+  uptime_days = Uint32Field(0x05)
 
 
 class ConfigurationMessage(Message):
