@@ -70,6 +70,9 @@
 // is not recommended.
 #define KB_METER_UPDATE_INTERVAL_MS 100
 
+// Heartbeat interval.  A "hello" packet will be emitted to the host this often.
+#define KB_HEARTBEAT_INTERVAL_MS (10 * 1000)
+
 // Number of relay outputs
 #define KB_NUM_RELAY_OUTPUTS 6
 

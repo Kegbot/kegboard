@@ -122,6 +122,7 @@ typedef struct {
   unsigned long uptime_ms;
   unsigned long last_uptime_ms;
   unsigned long last_meter_event;
+  unsigned long last_heartbeat;
   int uptime_days;
 } UptimeStat;
 
@@ -517,6 +518,11 @@ void updateTimekeeping() {
   if (gUptimeStat.uptime_ms >= MS_PER_DAY) {
     gUptimeStat.uptime_days += 1;
     gUptimeStat.uptime_ms -= MS_PER_DAY;
+  }
+
+  if ((now - gUptimeStat.last_meter_event) > KB_HEARTBEAT_INTERVAL_MS) {
+    gUptimeStat.last_heartbeat = now;
+    writeHelloPacket();
   }
 }
 
