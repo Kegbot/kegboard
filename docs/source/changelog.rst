@@ -6,6 +6,11 @@ Changelog
 Arduino Firmware
 -----------------
 
+v18 (2014-05-14)
+^^^^^^^^^^^^^^^^
+* Added heartbeat: device will send a Hello message every 10 seconds.
+* Hello message now includes uptime information.
+
 v17 (2014-02-12)
 ^^^^^^^^^^^^^^^^
 * Fixed a bug that broke serial communication (introduced in v16).
