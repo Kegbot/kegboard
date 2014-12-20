@@ -81,7 +81,7 @@ def wait_for_kegboard(interval=0.1, timeout=None, glob_paths=None):
 
   elapsed = 0
   while True:
-    paths = find_devices()
+    paths = find_devices(glob_paths)
     if paths:
       return Kegboard(paths[0])
 
