@@ -241,7 +241,7 @@ void meterInterruptE()
 #ifdef KB_PIN_METER_F
 void meterInterruptF()
 {
-  CHECK_METER(KB_PIN_METER_F, 1);
+  CHECK_METER(KB_PIN_METER_F, 5);
 }
 #endif
 
