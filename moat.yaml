@@ -1,0 +1,28 @@
+name: kegboard
+
+dependencies:
+  - python@3.14
+  - python-dev
+  - bun
+  - uv
+  - git
+
+grants:
+  - claude
+  - github
+
+volumes:
+  - name: venv
+    target: /workspace/.venv
+  - name: uv-cache
+    target: /root/.cache/uv
+
+language_servers:
+  - python
+  - typescript
+
+network:
+  policy: permissive
+  host:
+    - 3306    # MySQL (DATABASE_URL)
+    - 6379    # Redis (REDIS_URL)

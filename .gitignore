@@ -1,13 +1,15 @@
-### global stuff
-*.DS_Store
+# Python / tooling
+.venv/
+__pycache__/
 *.pyc
-*.egg
-*.o
-*.hex
 
-python/dist/*
-python/distribute-*
-python/*egg-info
+# ESPHome build output
+.esphome/
+secrets.yaml
 
-arduino/kegboard/.dep
-arduino/kegboard/.lib
+# Host test build output
+tests/core/build/
+
+# Editors / OS
+.DS_Store
+compile_commands.json

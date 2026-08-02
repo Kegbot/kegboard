@@ -1,0 +1,21 @@
+---
+extends: default
+
+ignore: |
+  .clang-format
+  .venv/
+
+rules:
+  document-start:
+    present: true
+  line-length:
+    max: 120
+    allow-non-breakable-words: true
+    allow-non-breakable-inline-mappings: true
+  truthy:
+    # GitHub Actions uses a bare `on:` key.
+    check-keys: false
+  comments:
+    min-spaces-from-content: 1
+  braces:
+    max-spaces-inside: 1
