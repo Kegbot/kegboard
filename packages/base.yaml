@@ -1,0 +1,51 @@
+---
+# Common Kegboard services: networking, OTA, logging, time, and the HTTP
+# client the Kegbot reporter uses.
+#
+# Include from a device config:
+#
+#   packages:
+#     base: !include ../packages/base.yaml
+#
+# Expects these substitutions to be defined by the including config:
+#   name, friendly_name
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  name_add_mac_suffix: false
+  project:
+    name: kegbot.kegboard
+    version: 2.0.0-dev
+
+logger:
+
+# Home Assistant / ESPHome native API. Harmless to leave enabled even when
+# reporting to Kegbot Server; it is how you watch a pour live while debugging.
+api:
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  # Falls back to an access point if the configured network is unreachable, so
+  # a board in a garage is never permanently unreachable.
+  ap:
+    ssid: ${name}-setup
+
+captive_portal:
+
+# Pours are timestamped against this. Without it the reporter falls back to
+# reporting pours by elapsed time, which Kegbot Server handles correctly but
+# which loses accuracy across long outages.
+time:
+  - platform: sntp
+    id: kegboard_time
+
+http_request:
+  # Self-hosted Kegbot Servers often use a private CA or a self-signed
+  # certificate. Set this to false there, or supply ca_certificate_path.
+  verify_ssl: true
+  timeout: 10s

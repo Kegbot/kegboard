@@ -1,0 +1,35 @@
+---
+# Tracks ESPHome's dev branch so their breaking changes surface here as a
+# failing scheduled build rather than as a user bug report weeks later.
+#
+# This job is expected to break occasionally. It does not gate PRs.
+name: ESPHome dev
+
+on:
+  schedule:
+    # Weekly, Monday early UTC.
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+
+jobs:
+  compile-against-dev:
+    name: Compile against ESPHome dev
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install ESPHome from dev
+        run: pip install git+https://github.com/esphome/esphome.git@dev
+
+      - name: Report version under test
+        run: esphome version
+
+      - name: Provide dummy secrets
+        run: cp examples/secrets.yaml.example examples/secrets.yaml
+
+      - name: Compile
+        run: esphome compile examples/kegbot-2tap.yaml

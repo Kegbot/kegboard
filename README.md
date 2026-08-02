@@ -37,21 +37,93 @@ Early. Under active construction — see the table below.
 | Area | State |
 |---|---|
 | Core pour logic (state machine, tick series, queue, API requests) | Done, unit tested |
-| `kegboard` hub component | In progress |
-| `kegboard_meter` flow meter component | In progress |
-| `kegboard_kegbot` HTTP reporter | In progress |
-| Temperature, relays, buzzer, LEDs | Planned |
+| `kegboard` hub component | Done |
+| `kegboard_meter` flow meter component | Done |
+| `kegboard_kegbot` HTTP reporter | Done |
+| Temperature via stock `dallas_temp` | Works |
+| Relays, buzzer, LEDs | Planned |
 | Auth tokens (RFID, iButton) | Planned |
 | Prebuilt binaries + web installer | Planned |
 
+Nothing has been validated against real hardware and a live Kegbot Server yet.
+
 Reporting is **HTTP only** for now. MQTT, BLE, and WebSocket transports are
 planned.
+
+## Configuration
+
+A minimal two-tap board reporting to a Kegbot Server:
+
+```yaml
+external_components:
+  - source: github://Kegbot/kegboard@main
+
+kegboard:
+  id: kb
+
+kegboard_meter:
+  - id: flow0
+    pin: GPIO4
+    index: 0
+    total:
+      name: Tap 1 Ticks
+    pouring:
+      name: Tap 1 Pouring
+
+kegboard_kegbot:
+  base_url: !secret kegbot_url
+  api_key: !secret kegbot_api_key
+  meters: [flow0]
+```
+
+See `examples/` for complete configs, and `boards/` for pin maps.
+
+### `kegboard`
+
+| Option | Default | Notes |
+|---|---|---|
+| `serial_number` | `kegboard-<mac>` | Board identity. Meters are named `<serial>.flow<index>`, which is how Kegbot Server keys a tap — set it explicitly to adopt a replaced board's identity. |
+
+### `kegboard_meter`
+
+| Option | Default | Notes |
+|---|---|---|
+| `pin` | required | Meter input. Pulled up internally; counts falling edges. |
+| `index` | `0` | Used to build the default meter name. |
+| `meter_name` | `<serial>.flow<index>` | Override to match an existing server-side meter. |
+| `ml_per_tick` | `0.185` | SwissFlow SF800 and clones (~5.4 ticks/mL). |
+| `debounce` | `1200us` | Matches the legacy firmware's filter. |
+| `idle_timeout` | `10s` | Silence after which a pour is considered finished. |
+| `min_pour_ticks` | `3` | Anything shorter is treated as a drip and discarded. |
+| `max_pour_duration` | `5min` | Safety cutoff for a stuck meter; `0s` disables. |
+| `report_interval` | `250ms` | Throttle for sensor updates during a pour. |
+| `series_resolution` | `100ms` | Bucket width for the diagnostic tick series; `0s` disables. |
+
+Optional entities: `total`, `volume`, `flow_rate`, `pouring`.
+Triggers: `on_pour_start`, `on_pour_end` (with `ticks`, `volume_ml`, `duration_ms`).
+Actions: `kegboard_meter.reset_total`, `.end_pour`, `.set_calibration`.
+
+### `kegboard_kegbot`
+
+| Option | Default | Notes |
+|---|---|---|
+| `base_url` | required | Server root. A trailing `/` or `/api` is accepted. |
+| `api_key` | required | Sent as `X-Kegbot-Api-Key`; needs a staff/superuser key. |
+| `meters` | `[]` | Meter IDs whose pours are reported. |
+| `thermo_sensors` | `[]` | `sensor:`/`name:` pairs; any ESPHome sensor works. |
+| `send_volume` | `false` | Off so the server's own per-meter calibration stays authoritative. |
+| `retry_interval` | `30s` | Base for exponential backoff, capped at 5 min. |
+
+Optional diagnostic entities: `queue_depth`, `dropped`. A non-zero `dropped`
+means pours were lost and is worth alerting on.
 
 ## Repository layout
 
 ```
 components/     ESPHome external components (this repo is the component source)
   kegboard/     Hub component + the framework-agnostic core (see CORE.md)
+  kegboard_meter/   Flow meter and pour detection
+  kegboard_kegbot/  Kegbot Server reporter
 packages/       Composable YAML users include
 boards/         Pin maps per target board
 examples/       Worked configurations

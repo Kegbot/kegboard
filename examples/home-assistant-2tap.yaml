@@ -1,0 +1,46 @@
+---
+# Two taps reported to Home Assistant only, with no Kegbot Server involved.
+#
+# Useful on its own, and a good way to verify wiring and calibration before
+# pointing a board at a server.
+
+substitutions:
+  name: kegboard
+  friendly_name: Kegboard
+
+packages:
+  board: !include ../boards/esp32-devkit.yaml
+  base: !include ../packages/base.yaml
+
+external_components:
+  - source:
+      type: local
+      path: ../components
+
+kegboard:
+  id: kb
+
+kegboard_meter:
+  - id: flow0
+    pin: ${meter0_pin}
+    index: 0
+    total:
+      name: Tap 1 Ticks
+    volume:
+      name: Tap 1 Pour Volume
+    pouring:
+      name: Tap 1 Pouring
+    on_pour_end:
+      - logger.log:
+          format: "Tap 1 poured %.0f mL in %.1f s"
+          args: [volume_ml, duration_ms / 1000.0f]
+
+  - id: flow1
+    pin: ${meter1_pin}
+    index: 1
+    total:
+      name: Tap 2 Ticks
+    volume:
+      name: Tap 2 Pour Volume
+    pouring:
+      name: Tap 2 Pouring

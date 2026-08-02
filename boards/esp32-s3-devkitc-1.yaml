@@ -1,0 +1,24 @@
+---
+# ESP32-S3-DevKitC-1 -- the Kegboard reference target.
+#
+# Chosen as the reference because it has native USB with USB-Serial-JTAG (so
+# flashing and debugging need no external adapter), ample GPIO for four taps
+# plus sensors, and PSRAM headroom for later additions like a display.
+#
+# Meter pins avoid GPIO 19/20 (native USB), 26-32 (SPI flash/PSRAM), and the
+# strapping pins 0/3/45/46.
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+
+substitutions:
+  meter0_pin: GPIO4
+  meter1_pin: GPIO5
+  meter2_pin: GPIO6
+  meter3_pin: GPIO7
+  onewire_pin: GPIO15
+  relay0_pin: GPIO16
+  relay1_pin: GPIO17
+  buzzer_pin: GPIO18

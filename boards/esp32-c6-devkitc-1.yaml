@@ -1,0 +1,19 @@
+---
+# ESP32-C6-DevKitC-1. Forward-looking target: WiFi 6, and Thread/Zigbee radios
+# for whatever the kegerator grows into next. Requires ESP-IDF; the Arduino
+# core does not support this chip.
+
+esp32:
+  board: esp32-c6-devkitc-1
+  framework:
+    type: esp-idf
+
+substitutions:
+  meter0_pin: GPIO4
+  meter1_pin: GPIO5
+  meter2_pin: GPIO6
+  meter3_pin: GPIO7
+  onewire_pin: GPIO10
+  relay0_pin: GPIO11
+  relay1_pin: GPIO18
+  buzzer_pin: GPIO19

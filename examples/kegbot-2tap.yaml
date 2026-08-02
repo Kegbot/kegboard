@@ -1,0 +1,75 @@
+---
+# Two taps reporting to a Kegbot Server, plus a keg temperature sensor.
+#
+# This is the flagship configuration: the board detects pours itself and posts
+# finished drinks to the server. No kegbot-pycore, no USB cable.
+
+substitutions:
+  name: kegboard
+  friendly_name: Kegboard
+
+packages:
+  board: !include ../boards/esp32-s3-devkitc-1.yaml
+  base: !include ../packages/base.yaml
+
+external_components:
+  # Users outside this repository should point at the published component
+  # source instead:
+  #   - source: github://Kegbot/kegboard@main
+  - source:
+      type: local
+      path: ../components
+
+kegboard:
+  id: kb
+  # Defaults to kegboard-<last 3 MAC bytes>. Set it explicitly if you are
+  # replacing a board and want the server to keep the same meter names.
+  # serial_number: kegboard-a1b2c3
+
+kegboard_meter:
+  - id: flow0
+    pin: ${meter0_pin}
+    index: 0
+    total:
+      name: Tap 1 Ticks
+    volume:
+      name: Tap 1 Pour Volume
+    flow_rate:
+      name: Tap 1 Flow Rate
+    pouring:
+      name: Tap 1 Pouring
+
+  - id: flow1
+    pin: ${meter1_pin}
+    index: 1
+    total:
+      name: Tap 2 Ticks
+    volume:
+      name: Tap 2 Pour Volume
+    flow_rate:
+      name: Tap 2 Flow Rate
+    pouring:
+      name: Tap 2 Pouring
+
+one_wire:
+  - platform: gpio
+    pin: ${onewire_pin}
+
+sensor:
+  - platform: dallas_temp
+    id: keg_temp
+    name: Keg Temperature
+    update_interval: 60s
+
+kegboard_kegbot:
+  id: kegbot
+  base_url: !secret kegbot_url
+  api_key: !secret kegbot_api_key
+  meters: [flow0, flow1]
+  thermo_sensors:
+    - sensor: keg_temp
+      name: thermo-keg
+  queue_depth:
+    name: Kegbot Queue Depth
+  dropped:
+    name: Kegbot Dropped Reports
