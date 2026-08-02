@@ -8,7 +8,7 @@
 #include <cstdint>
 #include <string>
 
-namespace kegboard {
+namespace kbcore {
 
 /// A prepared HTTP call, ready for whatever transport the platform layer uses.
 struct HttpCall {
@@ -99,4 +99,4 @@ std::string url_encode(const std::string &value);
 /// iostreams. Used for volume and temperature fields.
 std::string format_float(float value, int decimals);
 
-}  // namespace kegboard
+}  // namespace kbcore

@@ -2,7 +2,7 @@
 
 #include "test_support.h"
 
-using kegboard::TickSeries;
+using kbcore::TickSeries;
 
 namespace {
 

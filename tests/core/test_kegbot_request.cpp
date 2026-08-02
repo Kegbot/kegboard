@@ -2,10 +2,10 @@
 
 #include "test_support.h"
 
-using kegboard::DrinkReport;
-using kegboard::HttpCall;
-using kegboard::KegbotRequestBuilder;
-using kegboard::ThermoReport;
+using kbcore::DrinkReport;
+using kbcore::HttpCall;
+using kbcore::KegbotRequestBuilder;
+using kbcore::ThermoReport;
 
 namespace {
 
@@ -187,18 +187,18 @@ TEST(auth_token_get_builds_lookup_url) {
 }
 
 TEST(url_encode_leaves_unreserved_characters_alone) {
-  CHECK_EQ(kegboard::url_encode("abcXYZ019-_.~"), std::string("abcXYZ019-_.~"));
+  CHECK_EQ(kbcore::url_encode("abcXYZ019-_.~"), std::string("abcXYZ019-_.~"));
 }
 
 TEST(url_encode_escapes_reserved_and_high_bytes) {
-  CHECK_EQ(kegboard::url_encode("a b&c=d"), std::string("a%20b%26c%3Dd"));
-  CHECK_EQ(kegboard::url_encode("\xff"), std::string("%FF"));
+  CHECK_EQ(kbcore::url_encode("a b&c=d"), std::string("a%20b%26c%3Dd"));
+  CHECK_EQ(kbcore::url_encode("\xff"), std::string("%FF"));
 }
 
 TEST(format_float_handles_non_finite_values) {
   // A disconnected DS18B20 can produce NaN; it must not corrupt the body.
-  CHECK_EQ(kegboard::format_float(NAN, 3), std::string("0"));
-  CHECK_EQ(kegboard::format_float(INFINITY, 3), std::string("0"));
+  CHECK_EQ(kbcore::format_float(NAN, 3), std::string("0"));
+  CHECK_EQ(kbcore::format_float(INFINITY, 3), std::string("0"));
 }
 
 }  // namespace

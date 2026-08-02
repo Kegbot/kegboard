@@ -2,9 +2,9 @@
 
 #include "test_support.h"
 
-using kegboard::PourConfig;
-using kegboard::PourRecord;
-using kegboard::PourSession;
+using kbcore::PourConfig;
+using kbcore::PourRecord;
+using kbcore::PourSession;
 
 namespace {
 

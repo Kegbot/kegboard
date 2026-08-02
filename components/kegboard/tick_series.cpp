@@ -1,6 +1,6 @@
 #include "tick_series.h"
 
-namespace kegboard {
+namespace kbcore {
 
 void TickSeries::reset(uint32_t resolution_ms) {
   this->count_ = 0;
@@ -87,4 +87,4 @@ std::string TickSeries::to_string() const {
   return out;
 }
 
-}  // namespace kegboard
+}  // namespace kbcore

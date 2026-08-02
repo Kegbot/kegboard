@@ -3,7 +3,7 @@
 #include <cmath>
 #include <cstdio>
 
-namespace kegboard {
+namespace kbcore {
 
 namespace {
 
@@ -118,4 +118,4 @@ HttpCall KegbotRequestBuilder::auth_token_get(const std::string &device, const s
   return call;
 }
 
-}  // namespace kegboard
+}  // namespace kbcore

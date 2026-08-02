@@ -8,6 +8,12 @@ genuinely kegboard-specific rather than ESPHome-specific.
 - `kegbot_request.h` / `.cpp` — Kegbot Server API request construction
 - `ring_queue.h` — bounded FIFO for offline report buffering
 
+Core code lives in the global `kbcore` namespace, deliberately *not* in
+`esphome::kegboard`. The ESPHome component in this same directory occupies
+`esphome::kegboard`, and a global `kegboard` namespace would be shadowed by it
+from inside the component — every reference would silently need a leading `::`.
+`kbcore` sidesteps that.
+
 ## Rules
 
 1. **No framework headers.** Core files must not include anything from

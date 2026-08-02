@@ -1,6 +1,6 @@
 #include "pour_session.h"
 
-namespace kegboard {
+namespace kbcore {
 
 bool PourSession::add_ticks(uint32_t ticks, uint32_t now_ms, uint32_t now_unix) {
   if (ticks == 0)
@@ -75,4 +75,4 @@ bool PourSession::finish_(uint32_t now_ms, PourRecord *out) {
   return true;
 }
 
-}  // namespace kegboard
+}  // namespace kbcore

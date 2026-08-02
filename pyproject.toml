@@ -7,6 +7,9 @@ exclude = [".venv", "build"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "W"]
+# The formatter owns line length. E501 only fires on lines it cannot split
+# (long schema entries, URLs), where wrapping by hand hurts readability.
+ignore = ["E501"]
 
 [tool.ruff.lint.isort]
 force-sort-within-sections = true
