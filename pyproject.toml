@@ -1,0 +1,13 @@
+[tool.ruff]
+# Matches ESPHome's own Python conventions, since our codegen modules follow
+# the same idioms and most contributors arrive from that codebase.
+target-version = "py311"
+line-length = 88
+exclude = [".venv", "build"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "W"]
+
+[tool.ruff.lint.isort]
+force-sort-within-sections = true
+known-first-party = ["esphome"]

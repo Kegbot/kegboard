@@ -1,0 +1,32 @@
+---
+# Formatting and lint hooks. Install with: pre-commit install
+#
+# The C++ and Python conventions here deliberately mirror ESPHome's own, since
+# our components are compiled into their tree and most contributors will be
+# coming from that codebase. clang-format is pinned to the same v13 they pin.
+repos:
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v13.0.1
+    hooks:
+      - id: clang-format
+        types_or: [c, c++]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.1
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/adrienverge/yamllint.git
+    rev: v1.37.1
+    hooks:
+      - id: yamllint
+        exclude: ^\.clang-format$
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-merge-conflict
