@@ -1,0 +1,106 @@
+---
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pinned deliberately. ESPHome makes breaking changes to its external
+  # component API on a regular cadence, so contributors should not have a
+  # release land on them mid-PR. The nightly job in dev.yaml tracks upstream.
+  ESPHOME_VERSION: "2026.6.5"
+
+jobs:
+  core-tests:
+    name: Core unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check core purity
+        run: python3 script/check-core-purity.py
+
+      - name: Run tests
+        run: make -C tests/core STRICT=1
+
+  lint:
+    name: Lint and format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - uses: pre-commit/action@v3.0.1
+
+  config:
+    name: Validate configs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install ESPHome
+        run: pip install "esphome==${ESPHOME_VERSION}"
+
+      - name: Provide dummy secrets
+        run: cp examples/secrets.yaml.example examples/secrets.yaml
+
+      - name: Validate
+        run: |
+          for config in examples/*.yaml; do
+            case "$config" in *secrets*) continue;; esac
+            echo "::group::$config"
+            esphome config "$config"
+            echo "::endgroup::"
+          done
+
+  compile:
+    name: Compile ${{ matrix.board }}
+    runs-on: ubuntu-latest
+    needs: [core-tests, config]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - board: esp32-s3-devkitc-1
+            config: examples/kegbot-2tap.yaml
+          - board: esp32-devkit
+            config: examples/home-assistant-2tap.yaml
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Cache PlatformIO and ESP-IDF toolchains
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.espressif
+          key: pio-${{ matrix.board }}-${{ env.ESPHOME_VERSION }}-${{ hashFiles('boards/*.yaml') }}
+          restore-keys: |
+            pio-${{ matrix.board }}-${{ env.ESPHOME_VERSION }}-
+
+      - name: Install ESPHome
+        run: pip install "esphome==${ESPHOME_VERSION}"
+
+      - name: Provide dummy secrets
+        run: cp examples/secrets.yaml.example examples/secrets.yaml
+
+      - name: Compile
+        run: esphome compile ${{ matrix.config }}

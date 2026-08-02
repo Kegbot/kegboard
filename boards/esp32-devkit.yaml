@@ -1,0 +1,22 @@
+---
+# Classic ESP32 DevKitC (WROOM-32). Kept as a target because it is what most
+# people already have in a drawer.
+#
+# Meter pins avoid the input-only range (34-39, which have no internal
+# pull-ups and so cannot bias an open-collector meter), the flash pins
+# (6-11), and the strapping pins (0, 2, 12, 15).
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+substitutions:
+  meter0_pin: GPIO4
+  meter1_pin: GPIO5
+  meter2_pin: GPIO13
+  meter3_pin: GPIO14
+  onewire_pin: GPIO16
+  relay0_pin: GPIO17
+  relay1_pin: GPIO18
+  buzzer_pin: GPIO19
