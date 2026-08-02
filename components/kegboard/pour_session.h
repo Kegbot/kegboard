@@ -10,7 +10,7 @@
 
 #include "tick_series.h"
 
-namespace kegboard {
+namespace kbcore {
 
 /// A pour that has ended and is ready to be reported.
 struct PourRecord {
@@ -114,4 +114,4 @@ class PourSession {
   TickSeries series_;
 };
 
-}  // namespace kegboard
+}  // namespace kbcore

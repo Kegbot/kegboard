@@ -9,7 +9,7 @@
 #include <cstdint>
 #include <string>
 
-namespace kegboard {
+namespace kbcore {
 
 /// A bounded record of when ticks arrived during a pour.
 ///
@@ -70,4 +70,4 @@ class TickSeries {
   bool coarsened_{false};
 };
 
-}  // namespace kegboard
+}  // namespace kbcore

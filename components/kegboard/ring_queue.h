@@ -8,7 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace kegboard {
+namespace kbcore {
 
 /// A bounded FIFO backed by a fixed array, for buffering reports that could
 /// not be delivered yet.
@@ -75,4 +75,4 @@ template<typename T, size_t N> class RingQueue {
   uint32_t dropped_{0};
 };
 
-}  // namespace kegboard
+}  // namespace kbcore
