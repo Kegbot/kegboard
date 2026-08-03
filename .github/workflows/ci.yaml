@@ -42,6 +42,25 @@ jobs:
 
       - uses: pre-commit/action@v3.0.1
 
+  host-compile:
+    name: Host smoke compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install ESPHome
+        run: pip install "esphome==${ESPHOME_VERSION}"
+
+      # Compiles the components natively with the system compiler: a full
+      # type-check of the C++ in seconds, no ESP toolchain download. The ESP32
+      # matrix below still proves the real targets.
+      - name: Compile host smoke test
+        run: esphome compile tests/host/smoke.yaml
+
   config:
     name: Validate configs
     runs-on: ubuntu-latest
@@ -70,7 +89,7 @@ jobs:
   compile:
     name: Compile ${{ matrix.board }}
     runs-on: ubuntu-latest
-    needs: [core-tests, config]
+    needs: [core-tests, config, host-compile]
     strategy:
       fail-fast: false
       matrix:
@@ -79,6 +98,9 @@ jobs:
             config: examples/kegbot-2tap.yaml
           - board: esp32-devkit
             config: examples/home-assistant-2tap.yaml
+          # Widest surface: relays, buzzer, LEDs, rfid, ibutton, and auth.
+          - board: esp32-s3-full
+            config: examples/kegbot-full.yaml
     steps:
       - uses: actions/checkout@v5
 
