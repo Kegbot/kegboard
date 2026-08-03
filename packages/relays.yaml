@@ -1,0 +1,64 @@
+---
+# Two general-purpose relay outputs, each with a watchdog.
+#
+#   packages:
+#     relays: !include ../packages/relays.yaml
+#
+# Expects `relay0_pin` and `relay1_pin` substitutions (the board packages
+# provide them).
+#
+# The watchdog is the safety feature worth keeping from the AVR firmware: a
+# relay left on is usually a solenoid valve held open, and if the thing that
+# turned it on stops talking -- a crashed script, a dropped network, a closed
+# browser tab -- nobody is left to turn it off. Each relay therefore switches
+# itself off after `relay_watchdog_timeout` unless something turns it on again.
+#
+# The scripts use `mode: restart`, so re-issuing the on command restarts the
+# timer rather than stacking timers, matching the legacy behaviour where every
+# set_output reset the countdown.
+#
+# Set `relay_watchdog_timeout: 0s` to disable, but consider what is downstream
+# of the relay first.
+
+substitutions:
+  relay_watchdog_timeout: 10s
+
+switch:
+  - platform: gpio
+    id: relay0
+    name: Relay 1
+    pin: ${relay0_pin}
+    restore_mode: ALWAYS_OFF
+    on_turn_on:
+      - script.execute: relay0_watchdog
+    on_turn_off:
+      - script.stop: relay0_watchdog
+
+  - platform: gpio
+    id: relay1
+    name: Relay 2
+    pin: ${relay1_pin}
+    restore_mode: ALWAYS_OFF
+    on_turn_on:
+      - script.execute: relay1_watchdog
+    on_turn_off:
+      - script.stop: relay1_watchdog
+
+script:
+  - id: relay0_watchdog
+    mode: restart
+    then:
+      - delay: ${relay_watchdog_timeout}
+      - logger.log:
+          format: "Relay 1 watchdog expired, turning off"
+          level: WARN
+      - switch.turn_off: relay0
+
+  - id: relay1_watchdog
+    mode: restart
+    then:
+      - delay: ${relay_watchdog_timeout}
+      - logger.log:
+          format: "Relay 2 watchdog expired, turning off"
+          level: WARN
+      - switch.turn_off: relay1

@@ -1,0 +1,42 @@
+---
+# Piezo buzzer with the legacy Kegboard melodies.
+#
+#   packages:
+#     buzzer: !include ../packages/buzzer.yaml
+#
+# Expects a `buzzer_pin` substitution (the board packages provide one).
+# Drive a passive piezo directly from the pin; an active buzzer generates its
+# own tone and will ignore the melody.
+
+output:
+  - platform: ledc
+    pin: ${buzzer_pin}
+    id: kegboard_buzzer_out
+
+rtttl:
+  id: kegboard_buzzer
+  output: kegboard_buzzer_out
+
+script:
+  # Three short beeps and a longer one, transcribed from the AVR firmware's
+  # BOOT_MELODY so a board still sounds like a Kegboard.
+  - id: play_boot_melody
+    then:
+      - rtttl.play: "boot:d=16,o=6,b=200:c,p,c,p,c,8f"
+
+  # Rising three-note chirp, from AUTH_ON_MELODY.
+  - id: play_auth_melody
+    then:
+      - rtttl.play: "auth:d=32,o=6,b=200:a,p,d,p,f"
+
+  # Two notes, from PING_MELODY.
+  - id: play_ping_melody
+    then:
+      - rtttl.play: "ping:d=16,o=6,b=200:d,a"
+
+esphome:
+  on_boot:
+    # After peripherals are up, so the beep means "ready", not "powered".
+    priority: -100
+    then:
+      - script.execute: play_boot_melody
