@@ -148,7 +148,7 @@ A completed pour: the durable record. Emitted once, when the pour ends.
 | Field | Type | Req | Description |
 |---|---|---|---|
 | `meter` | integer | yes | Meter number on this device, 0-based. `(device, meter)` identifies a tap server-side. |
-| `pour_id` | string | no | Globally unique, **opaque** pour identifier; see §5.2. SHOULD be present; MUST be present if any `pour_update` was emitted for this pour. |
+| `pour_id` | string | yes | Globally unique, **opaque** pour identifier; see §5.2. |
 | `volume_ml` | number | yes | Poured volume. **Authoritative.** Computed on-device from its own calibration. |
 | `duration_ms` | integer | yes | First tick to last tick. |
 | `user` | string | no | Username the pour is attributed to. Absent means unattributed/guest. |
@@ -169,8 +169,7 @@ default 1000; `0` disables) from pour start until the final `pour` event.
   "meter": 0,
   "pour_id": "5f8e2c34-9d1b-4a7e-b02c-8f13d9a6e415",
   "volume_ml": 120.4,
-  "duration_ms": 2400,
-  "rate_ml_per_min": 2800.0
+  "duration_ms": 2400
 }
 ```
 
@@ -180,7 +179,10 @@ default 1000; `0` disables) from pour start until the final `pour` event.
 | `pour_id` | string | yes | Identifies the pour: all updates of one pour and its final `pour` event carry the same value. **Opaque and globally unique** — the device currently generates a UUIDv4, but clients MUST NOT validate the format; it may change. Usable as-is as a key, with no device/boot qualifiers. |
 | `volume_ml` | number | yes | Volume so far. |
 | `duration_ms` | integer | yes | Elapsed since first tick. |
-| `rate_ml_per_min` | number | no | Instantaneous flow rate. |
+
+There is no rate field: flow rate is derivable (`volume_ml / duration_ms`, or
+better, the delta between successive updates), and the protocol does not
+carry what a receiver can compute.
 
 **`pour_update` is best-effort and ephemeral**, and is the one exception to
 §9's delivery guarantees: the device sends updates only when the connection
@@ -262,7 +264,7 @@ visible and for letting the server discover device settings it cannot set.
 | `wifi_rssi_dbm` | integer | no | Signal strength. |
 | `events_dropped` | integer | yes | Lifetime count of events evicted from the queue before delivery. A non-zero delta between heartbeats means data was lost. |
 | `config` | object | yes | Operative device settings the server should be able to discover without being able to set them: heartbeat interval, pour-update interval, queue capacity. Extensible; servers MUST ignore unknown keys. |
-| `meters` | array | no | Per-meter lifetime tick totals and current calibration. Lets a server detect missed pours by gap analysis. |
+| `meters` | array | no | Per-meter lifetime tick totals and current calibration (`ml_per_tick` always present). Lets a server detect missed pours by gap analysis. |
 
 ### 5.6 `command_result`
 
@@ -310,7 +312,7 @@ The response to every authenticated 2xx exchange:
 
 | Field | Type | Req | Description |
 |---|---|---|---|
-| `commands` | array | yes (may be empty) | Server→device instructions, oldest first. |
+| `commands` | array | no | Server→device instructions, oldest first. Absent means none — equivalent to `[]`. |
 | `commands[].id` | string | yes | Server-assigned, opaque. Devices MUST deduplicate on it: a server re-sends a command until it sees a `command_result`, so the same command may arrive more than once. |
 | `commands[].type` | string | yes | Command type. Devices MUST acknowledge unknown types with `result: "unsupported"`. |
 | `commands[].data` | object | yes | Type-specific payload. |
@@ -469,130 +471,368 @@ Normative, to ship in-repo as `schemas/kegboard-event.schema.json`.
   "$id": "https://kegbot.org/schemas/kegboard-event/1",
   "title": "Kegboard event batch",
   "type": "object",
-  "required": ["v", "device", "boot_id", "sent_uptime_ms", "events"],
+  "required": [
+    "v",
+    "device",
+    "boot_id",
+    "sent_uptime_ms",
+    "events"
+  ],
   "properties": {
-    "v": { "const": 1 },
-    "device": { "type": "string", "minLength": 1, "maxLength": 64 },
-    "boot_id": { "type": "string", "minLength": 1, "maxLength": 32 },
-    "sent_uptime_ms": { "type": "integer", "minimum": 0 },
+    "v": {
+      "const": 1
+    },
+    "device": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "boot_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32
+    },
+    "sent_uptime_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
     "events": {
       "type": "array",
       "minItems": 1,
       "maxItems": 16,
-      "items": { "$ref": "#/$defs/event" }
+      "items": {
+        "$ref": "#/$defs/event"
+      }
     }
   },
   "$defs": {
     "event": {
       "type": "object",
-      "required": ["id", "type", "age_ms", "data"],
+      "required": [
+        "id",
+        "type",
+        "age_ms",
+        "data"
+      ],
       "properties": {
-        "id": { "type": "integer", "minimum": 1 },
-        "type": { "type": "string" },
-        "age_ms": { "type": "integer", "minimum": 0 },
-        "time": { "type": "string", "format": "date-time" },
-        "data": { "type": "object" }
+        "id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "type": {
+          "type": "string"
+        },
+        "age_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "time": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "data": {
+          "type": "object"
+        }
       },
       "allOf": [
         {
-          "if": { "properties": { "type": { "const": "pour" } } },
-          "then": { "properties": { "data": { "$ref": "#/$defs/pour" } } }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "pour"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "data": {
+                "$ref": "#/$defs/pour"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "const": "pour_update" } } },
-          "then": { "properties": { "data": { "$ref": "#/$defs/pour_update" } } }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "pour_update"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "data": {
+                "$ref": "#/$defs/pour_update"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "const": "temperature" } } },
-          "then": { "properties": { "data": { "$ref": "#/$defs/temperature" } } }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "temperature"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "data": {
+                "$ref": "#/$defs/temperature"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "const": "token" } } },
-          "then": { "properties": { "data": { "$ref": "#/$defs/token" } } }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "token"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "data": {
+                "$ref": "#/$defs/token"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "const": "status" } } },
-          "then": { "properties": { "data": { "$ref": "#/$defs/status" } } }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "status"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "data": {
+                "$ref": "#/$defs/status"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "const": "command_result" } } },
-          "then": { "properties": { "data": { "$ref": "#/$defs/command_result" } } }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "command_result"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "data": {
+                "$ref": "#/$defs/command_result"
+              }
+            }
+          }
         }
       ]
     },
     "pour": {
       "type": "object",
-      "required": ["meter", "volume_ml", "duration_ms"],
+      "required": [
+        "meter",
+        "pour_id",
+        "volume_ml",
+        "duration_ms"
+      ],
       "properties": {
-        "meter": { "type": "integer", "minimum": 0 },
-        "pour_id": { "type": "string", "minLength": 1, "maxLength": 64 },
-        "volume_ml": { "type": "number", "exclusiveMinimum": 0 },
-        "duration_ms": { "type": "integer", "minimum": 0 },
-        "user": { "type": "string" },
-        "auth_device": { "type": "string" },
-        "auth_token": { "type": "string" },
-        "ticks": { "type": "integer", "minimum": 0 },
-        "ml_per_tick": { "type": "number", "exclusiveMinimum": 0 },
-        "tick_series": { "type": "string", "pattern": "^\\d+:\\d+( \\d+:\\d+)*$" }
+        "meter": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pour_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "volume_ml": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "user": {
+          "type": "string"
+        },
+        "auth_device": {
+          "type": "string"
+        },
+        "auth_token": {
+          "type": "string"
+        },
+        "ticks": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ml_per_tick": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "tick_series": {
+          "type": "string",
+          "pattern": "^\\d+:\\d+( \\d+:\\d+)*$"
+        }
       }
     },
     "pour_update": {
       "type": "object",
-      "required": ["meter", "pour_id", "volume_ml", "duration_ms"],
+      "required": [
+        "meter",
+        "pour_id",
+        "volume_ml",
+        "duration_ms"
+      ],
       "properties": {
-        "meter": { "type": "integer", "minimum": 0 },
-        "pour_id": { "type": "string", "minLength": 1, "maxLength": 64 },
-        "volume_ml": { "type": "number", "minimum": 0 },
-        "duration_ms": { "type": "integer", "minimum": 0 },
-        "rate_ml_per_min": { "type": "number", "minimum": 0 }
+        "meter": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pour_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "volume_ml": {
+          "type": "number",
+          "minimum": 0
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
     "temperature": {
       "type": "object",
-      "required": ["sensor", "temp_c"],
+      "required": [
+        "sensor",
+        "temp_c"
+      ],
       "properties": {
-        "sensor": { "type": "string", "minLength": 1 },
-        "temp_c": { "type": "number" }
+        "sensor": {
+          "type": "string",
+          "minLength": 1
+        },
+        "temp_c": {
+          "type": "number"
+        }
       }
     },
     "token": {
       "type": "object",
-      "required": ["auth_device", "token", "action"],
+      "required": [
+        "auth_device",
+        "token",
+        "action"
+      ],
       "properties": {
-        "auth_device": { "type": "string", "minLength": 1 },
-        "token": { "type": "string", "minLength": 1 },
-        "action": { "enum": ["attached", "detached"] },
-        "status": { "enum": ["accepted", "denied"] },
-        "user": { "type": "string" }
+        "auth_device": {
+          "type": "string",
+          "minLength": 1
+        },
+        "token": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action": {
+          "enum": [
+            "attached",
+            "detached"
+          ]
+        },
+        "status": {
+          "enum": [
+            "accepted",
+            "denied"
+          ]
+        },
+        "user": {
+          "type": "string"
+        }
       }
     },
     "status": {
       "type": "object",
-      "required": ["state", "fw_version", "uptime_ms", "events_dropped", "config"],
+      "required": [
+        "state",
+        "fw_version",
+        "uptime_ms",
+        "events_dropped",
+        "config"
+      ],
       "properties": {
-        "state": { "enum": ["boot", "heartbeat"] },
-        "fw_version": { "type": "string" },
-        "uptime_ms": { "type": "integer", "minimum": 0 },
-        "wifi_rssi_dbm": { "type": "integer" },
-        "events_dropped": { "type": "integer", "minimum": 0 },
+        "state": {
+          "enum": [
+            "boot",
+            "heartbeat"
+          ]
+        },
+        "fw_version": {
+          "type": "string"
+        },
+        "uptime_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "wifi_rssi_dbm": {
+          "type": "integer"
+        },
+        "events_dropped": {
+          "type": "integer",
+          "minimum": 0
+        },
         "config": {
           "type": "object",
-          "required": ["heartbeat_ms", "pour_update_ms", "queue_capacity"],
+          "required": [
+            "heartbeat_ms",
+            "pour_update_ms",
+            "queue_capacity"
+          ],
           "properties": {
-            "heartbeat_ms": { "type": "integer", "minimum": 1000 },
-            "pour_update_ms": { "type": "integer", "minimum": 0 },
-            "queue_capacity": { "type": "integer", "minimum": 1 }
+            "heartbeat_ms": {
+              "type": "integer",
+              "minimum": 1000
+            },
+            "pour_update_ms": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "queue_capacity": {
+              "type": "integer",
+              "minimum": 1
+            }
           }
         },
         "meters": {
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["meter", "total_ticks"],
+            "required": [
+              "meter",
+              "total_ticks",
+              "ml_per_tick"
+            ],
             "properties": {
-              "meter": { "type": "integer", "minimum": 0 },
-              "total_ticks": { "type": "integer", "minimum": 0 },
-              "ml_per_tick": { "type": "number", "exclusiveMinimum": 0 }
+              "meter": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "total_ticks": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "ml_per_tick": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
             }
           }
         }
@@ -600,11 +840,25 @@ Normative, to ship in-repo as `schemas/kegboard-event.schema.json`.
     },
     "command_result": {
       "type": "object",
-      "required": ["command", "result"],
+      "required": [
+        "command",
+        "result"
+      ],
       "properties": {
-        "command": { "type": "string", "minLength": 1 },
-        "result": { "enum": ["ok", "error", "unsupported"] },
-        "message": { "type": "string" }
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "enum": [
+            "ok",
+            "error",
+            "unsupported"
+          ]
+        },
+        "message": {
+          "type": "string"
+        }
       }
     }
   }

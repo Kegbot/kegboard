@@ -21,11 +21,13 @@ Event make_event(uint32_t id, const char *type, uint32_t created_ms, std::string
 TEST(pour_data_minimal_has_only_required_fields) {
   PourData d;
   d.meter = 1;
+  d.pour_id = "5f8e2c34-9d1b-4a7e-b02c-8f13d9a6e415";
   d.volume_ml = 355.0f;
   d.duration_ms = 7100;
   const std::string json = pour_data_json(d);
 
-  CHECK_EQ(json, std::string(R"({"meter":1,"volume_ml":355.000,"duration_ms":7100})"));
+  CHECK_EQ(json, std::string(R"({"meter":1,"pour_id":"5f8e2c34-9d1b-4a7e-b02c-8f13d9a6e415",)"
+                             R"("volume_ml":355.000,"duration_ms":7100})"));
 }
 
 TEST(pour_data_full_includes_optionals) {
@@ -54,6 +56,7 @@ TEST(pour_data_zero_ticks_is_still_emitted) {
   // UINT32_MAX sentinel omits the field.
   PourData d;
   d.meter = 0;
+  d.pour_id = "x";
   d.volume_ml = 1.0f;
   d.duration_ms = 1;
   d.ticks = 0;
@@ -88,7 +91,7 @@ TEST(status_data_includes_config_always) {
 }
 
 TEST(batch_age_is_computed_from_send_time) {
-  Event e = make_event(17, "pour", 1000, R"({"meter":0,"volume_ml":1.000,"duration_ms":1})");
+  Event e = make_event(17, "pour", 1000, R"({"meter":0,"pour_id":"x","volume_ml":1.000,"duration_ms":1})");
   const std::string json = serialize_batch("kegboard-a1b2c3", "9f3a2c1b", 5000, {&e});
 
   CHECK(json.find("\"age_ms\":4000") != std::string::npos);
@@ -101,7 +104,7 @@ TEST(batch_age_is_computed_from_send_time) {
 }
 
 TEST(batch_age_survives_millis_rollover) {
-  Event e = make_event(1, "pour", 0xFFFFFF00u, R"({"meter":0,"volume_ml":1.000,"duration_ms":1})");
+  Event e = make_event(1, "pour", 0xFFFFFF00u, R"({"meter":0,"pour_id":"x","volume_ml":1.000,"duration_ms":1})");
   const std::string json = serialize_batch("d", "b", 500, {&e});
   // 0x100 + 500 = 756 ms elapsed across the wrap.
   CHECK(json.find("\"age_ms\":756") != std::string::npos);
@@ -162,6 +165,7 @@ static int emit_samples(const char *dir) {
 
   PourData minimal;
   minimal.meter = 3;
+  minimal.pour_id = "0d4f9b82-6e3a-4c15-a7b8-2c9d0e1f6a3b";
   minimal.volume_ml = 10.5f;
   minimal.duration_ms = 900;
 
@@ -176,7 +180,7 @@ static int emit_samples(const char *dir) {
   st.pour_update_ms = 1000;
   st.queue_capacity = 16;
   st.meters.push_back({0, 920791, 0.185f});
-  st.meters.push_back({1, 42031, 0.0f});
+  st.meters.push_back({1, 42031, 0.185f});
 
   struct Sample {
     const char *name;
@@ -188,7 +192,7 @@ static int emit_samples(const char *dir) {
   };
   samples[0].event = Event{17, "pour", 1000, "2026-08-03T18:02:11Z", pour_data_json(full)};
   samples[1].event = Event{18, "pour", 1500, "", pour_data_json(minimal)};
-  samples[2].event = Event{19, "pour_update", 2000, "", pour_update_data_json(0, full.pour_id, 120.4f, 2400, 2800.0f)};
+  samples[2].event = Event{19, "pour_update", 2000, "", pour_update_data_json(0, full.pour_id, 120.4f, 2400)};
   samples[3].event = Event{20, "temperature", 2500, "", temperature_data_json("thermo-28ff641d8fbb0517", 4.25f)};
   samples[4].event =
       Event{21, "token", 3000, "", token_data_json("core.rfid", "0089f2c4", true, TokenStatus::NONE, "")};

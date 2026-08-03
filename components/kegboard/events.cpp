@@ -11,10 +11,8 @@ std::string pour_data_json(const PourData &d) {
   w.begin_object();
   w.key("meter");
   w.value(static_cast<uint32_t>(d.meter));
-  if (!d.pour_id.empty()) {
-    w.key("pour_id");
-    w.value(d.pour_id);
-  }
+  w.key("pour_id");
+  w.value(d.pour_id);
   w.key("volume_ml");
   w.value(d.volume_ml, 3);
   w.key("duration_ms");
@@ -47,8 +45,7 @@ std::string pour_data_json(const PourData &d) {
   return w.str();
 }
 
-std::string pour_update_data_json(uint8_t meter, const std::string &pour_id, float volume_ml, uint32_t duration_ms,
-                                  float rate_ml_per_min) {
+std::string pour_update_data_json(uint8_t meter, const std::string &pour_id, float volume_ml, uint32_t duration_ms) {
   JsonWriter w;
   w.begin_object();
   w.key("meter");
@@ -59,10 +56,6 @@ std::string pour_update_data_json(uint8_t meter, const std::string &pour_id, flo
   w.value(volume_ml, 3);
   w.key("duration_ms");
   w.value(duration_ms);
-  if (rate_ml_per_min >= 0.0f) {
-    w.key("rate_ml_per_min");
-    w.value(rate_ml_per_min, 1);
-  }
   w.end_object();
   return w.str();
 }
@@ -133,10 +126,8 @@ std::string status_data_json(const StatusData &d) {
       w.value(static_cast<uint32_t>(m.meter));
       w.key("total_ticks");
       w.value(m.total_ticks);
-      if (m.ml_per_tick > 0.0f) {
-        w.key("ml_per_tick");
-        w.value(m.ml_per_tick, 4);
-      }
+      w.key("ml_per_tick");
+      w.value(m.ml_per_tick, 4);
       w.end_object();
     }
     w.end_array();
