@@ -20,3 +20,7 @@ substitutions:
   relay0_pin: GPIO17
   relay1_pin: GPIO18
   buzzer_pin: GPIO19
+  led0_pin: GPIO21
+  led1_pin: GPIO22
+  rfid_rx_pin: GPIO23
+  onewire_auth_pin: GPIO25
