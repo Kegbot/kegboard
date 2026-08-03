@@ -30,6 +30,14 @@ jobs:
       - name: Run tests
         run: make -C tests/core STRICT=1
 
+      - name: Install jsonschema
+        run: pip install jsonschema
+
+      # The firmware's serialized output must validate against the normative
+      # protocol schemas, and the schema files must match the doc appendices.
+      - name: Check protocol schema conformance
+        run: python3 script/check-events-schema.py
+
   lint:
     name: Lint and format
     runs-on: ubuntu-latest

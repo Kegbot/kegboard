@@ -28,6 +28,10 @@ CORE_FILES = [
     "ring_queue.h",
     "auth_session.h",
     "auth_session.cpp",
+    "json_writer.h",
+    "json_writer.cpp",
+    "events.h",
+    "events.cpp",
 ]
 
 FORBIDDEN = re.compile(
