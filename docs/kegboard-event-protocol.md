@@ -648,4 +648,3 @@ Covers both the authenticated (200) and pairing (401) responses.
   }
 }
 ```
-

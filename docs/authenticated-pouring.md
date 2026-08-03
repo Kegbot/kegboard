@@ -213,4 +213,3 @@ outcome: `meters: [...]`.
   omits them; the server records a guest pour.
 - A grant ending mid-pour ends the pour first, so attribution reflects who
   actually poured. The next pour on that meter is whoever authorizes next.
-
