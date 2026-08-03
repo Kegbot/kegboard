@@ -31,21 +31,27 @@ CORE_SRCS := \
 	$(CORE_DIR)/pour_session.cpp \
 	$(CORE_DIR)/tick_series.cpp \
 	$(CORE_DIR)/kegbot_request.cpp \
-	$(CORE_DIR)/auth_session.cpp
+	$(CORE_DIR)/auth_session.cpp \
+	$(CORE_DIR)/json_writer.cpp \
+	$(CORE_DIR)/events.cpp
 
 CORE_HDRS := \
 	$(CORE_DIR)/pour_session.h \
 	$(CORE_DIR)/tick_series.h \
 	$(CORE_DIR)/kegbot_request.h \
 	$(CORE_DIR)/ring_queue.h \
-	$(CORE_DIR)/auth_session.h
+	$(CORE_DIR)/auth_session.h \
+	$(CORE_DIR)/json_writer.h \
+	$(CORE_DIR)/events.h
 
 TESTS := \
 	test_pour_session \
 	test_tick_series \
 	test_kegbot_request \
 	test_ring_queue \
-	test_auth_session
+	test_auth_session \
+	test_json_writer \
+	test_events
 
 BINARIES := $(addprefix $(BUILD_DIR)/,$(TESTS))
 
