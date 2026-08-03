@@ -11,6 +11,10 @@ This is **Kegboard v4**, a ground-up rewrite for **ESP32** built on
 > [`arduino`](https://github.com/Kegbot/kegboard/tree/arduino) branch. It is
 > feature-frozen and does not speak the same protocol as this one.
 
+**[📖 Documentation](https://docs.kegbot.org/projects/kegboard)** — overview,
+operating modes, installation, wiring, configuration, and the protocol specs.
+Sources in [`docs/`](docs/).
+
 ## What changed, and why
 
 The old Kegboard was a dumb sensor pipe: it streamed raw tick counts over USB
@@ -171,7 +175,7 @@ components/     ESPHome external components (this repo is the component source)
   kegboard_onewire/   iButton presence
 packages/       Composable YAML users include
 boards/         Pin maps per target board
-docs/           Protocol specifications
+docs/           Manual + protocol specifications
 schemas/        Normative JSON Schemas for the protocol
 examples/       Worked configurations
 tests/core/     Host unit tests -- plain g++, no hardware, no toolchain
@@ -197,6 +201,16 @@ compile into ESPHome's tree:
 ```console
 $ pip install pre-commit && pre-commit install
 $ pre-commit run --all-files
+```
+
+The manual is a Sphinx project in `docs/`, published at
+[docs.kegbot.org/projects/kegboard](https://docs.kegbot.org/projects/kegboard).
+Its toolchain is managed by [uv](https://docs.astral.sh/uv/), synced
+automatically on first use:
+
+```console
+$ make -C docs html          # output in docs/_build/html/
+$ make -C docs livehtml      # live-rebuild server while editing
 ```
 
 ## Simulator

@@ -1,0 +1,18 @@
+# Read the Docs configuration file
+# See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
+
+version: 2
+
+# Install the docs toolchain with uv from docs/uv.lock and build with
+# sphinx. docs/ is a self-contained uv project; the firmware repo itself
+# contains nothing to install.
+build:
+  os: ubuntu-24.04
+  tools:
+    python: '3.13'
+  commands:
+    - asdf plugin add uv
+    - asdf install uv latest
+    - asdf global uv latest
+    - uv sync --project docs --frozen
+    - uv run --project docs --no-sync sphinx-build -T -b html docs $READTHEDOCS_OUTPUT/html
