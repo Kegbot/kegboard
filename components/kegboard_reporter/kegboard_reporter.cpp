@@ -234,6 +234,8 @@ bool KegboardReporter::send_batch_(std::vector<kbcore::Event> &&ephemeral) {
   const std::string body = kbcore::serialize_batch(this->hub_ != nullptr ? this->hub_->serial_number() : "kegboard",
                                                    this->boot_id_, millis(), batch);
 
+  ESP_LOGVV(TAG, "POST %s\n%s", this->reporting_url_.c_str(), body.c_str());
+
   std::vector<http_request::Header> headers;
   headers.push_back({"Content-Type", "application/json"});
   if (this->is_paired())
@@ -256,6 +258,12 @@ bool KegboardReporter::send_batch_(std::vector<kbcore::Event> &&ephemeral) {
       response.clear();
   }
   container->end();
+
+  // Success is otherwise silent; failures get their own warnings below.
+  ESP_LOGD(TAG, "POST -> %d (%u events, %u bytes)", status, static_cast<unsigned>(batch.size()),
+           static_cast<unsigned>(body.size()));
+  if (!response.empty())
+    ESP_LOGVV(TAG, "Response: %s", response.c_str());
 
   this->handle_response_(status, response, queued_in_batch);
   return http_request::is_success(status);
