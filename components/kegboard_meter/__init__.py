@@ -214,10 +214,13 @@ METER_ACTION_SCHEMA = automation.maybe_simple_id(
 
 
 @automation.register_action(
-    "kegboard_meter.reset_total", ResetTotalAction, METER_ACTION_SCHEMA
+    "kegboard_meter.reset_total",
+    ResetTotalAction,
+    METER_ACTION_SCHEMA,
+    synchronous=True,
 )
 @automation.register_action(
-    "kegboard_meter.end_pour", EndPourAction, METER_ACTION_SCHEMA
+    "kegboard_meter.end_pour", EndPourAction, METER_ACTION_SCHEMA, synchronous=True
 )
 async def meter_action_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
@@ -234,6 +237,7 @@ async def meter_action_to_code(config, action_id, template_arg, args):
             cv.Required(CONF_VALUE): cv.templatable(cv.positive_float),
         }
     ),
+    synchronous=True,
 )
 async def set_calibration_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)

@@ -190,10 +190,16 @@ TOKEN_ACTION_SCHEMA = cv.Schema(
 
 
 @automation.register_action(
-    "kegboard_auth.token_attached", TokenAttachedAction, TOKEN_ACTION_SCHEMA
+    "kegboard_auth.token_attached",
+    TokenAttachedAction,
+    TOKEN_ACTION_SCHEMA,
+    synchronous=True,
 )
 @automation.register_action(
-    "kegboard_auth.token_detached", TokenDetachedAction, TOKEN_ACTION_SCHEMA
+    "kegboard_auth.token_detached",
+    TokenDetachedAction,
+    TOKEN_ACTION_SCHEMA,
+    synchronous=True,
 )
 async def token_action_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
@@ -209,6 +215,7 @@ async def token_action_to_code(config, action_id, template_arg, args):
     "kegboard_auth.revoke",
     RevokeAction,
     automation.maybe_simple_id({cv.GenerateID(): cv.use_id(KegboardAuth)}),
+    synchronous=True,
 )
 async def revoke_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg)
