@@ -47,7 +47,12 @@ const std::string &KegboardMeter::meter_name() {
 uint32_t KegboardMeter::take_isr_ticks_() {
   uint32_t ticks;
   {
+#ifndef USE_HOST
+    // Guarded because the host platform has no interrupts to mask, and so no
+    // InterruptLock implementation. There the "ISR" never runs either, so the
+    // unlocked read is equally correct.
     InterruptLock lock;
+#endif
     ticks = this->isr_ticks_;
     this->isr_ticks_ = 0;
   }
@@ -102,7 +107,7 @@ void KegboardMeter::handle_pour_end_(const kbcore::PourRecord &record) {
   for (auto *trigger : this->pour_end_triggers_)
     trigger->trigger(record.ticks, record.volume_ml, record.duration_ms);
 
-  this->pour_callbacks_.call(record, this->meter_name());
+  this->pour_callbacks_.call(record, this->meter_name(), this->active_username_);
 }
 
 void KegboardMeter::publish_state_(bool force) {

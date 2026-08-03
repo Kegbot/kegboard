@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "esphome/components/http_request/http_request.h"
+#include "esphome/components/json/json_util.h"
 #include "esphome/components/kegboard/kegboard.h"
 #include "esphome/components/kegboard/kegbot_request.h"
 #include "esphome/components/kegboard/pour_session.h"
@@ -48,11 +49,16 @@ class KegbotReporter : public Component {
   void add_meter(kegboard_meter::KegboardMeter *meter);
   void add_thermo_sensor(sensor::Sensor *sensor, const std::string &name);
 
+  /// Resolve a token to a Kegbot username via /api/auth-tokens.
+  /// @return true when the token is known and enabled; `username` may still
+  ///         be empty if the token exists but is not assigned to a user.
+  bool lookup_token(const std::string &device, const std::string &token, std::string *username);
+
   void set_queue_depth_sensor(sensor::Sensor *s) { this->queue_depth_sensor_ = s; }
   void set_dropped_sensor(sensor::Sensor *s) { this->dropped_sensor_ = s; }
 
  protected:
-  void queue_drink_(const kbcore::PourRecord &record, const std::string &meter_name);
+  void queue_drink_(const kbcore::PourRecord &record, const std::string &meter_name, const std::string &username);
   void queue_thermo_(const std::string &name, float temp_c);
 
   /// Send one queued item, if any. Returns true if the queue should be

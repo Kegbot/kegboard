@@ -26,7 +26,7 @@ from ..kegboard_meter import KegboardMeter
 
 CODEOWNERS = ["@mikey"]
 DEPENDENCIES = ["kegboard", "http_request", "time"]
-AUTO_LOAD = ["sensor"]
+AUTO_LOAD = ["sensor", "json"]
 
 CONF_API_KEY = "api_key"
 CONF_BASE_URL = "base_url"
