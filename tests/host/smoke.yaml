@@ -1,0 +1,94 @@
+---
+# Native host build that type-checks the kegboard components without an ESP32
+# toolchain -- seconds instead of minutes, so CI runs it as the first gate.
+# Not a shippable target.
+#
+# Exercises the template instantiations that a plain ESP32 example misses:
+# actions invoked from automations with arguments (Ts = {std::string}, ...),
+# which is exactly where an override-signature mismatch hides.
+#
+# kegboard_onewire is absent: ESPHome's gpio one_wire platform itself does not
+# link on host (no InterruptLock implementation). The ESP32 compile matrix
+# covers it via examples/kegbot-full.yaml.
+
+esphome:
+  name: kegboard-host-smoke
+
+host:
+
+logger:
+
+time:
+  - platform: host
+    id: host_time
+
+http_request:
+  verify_ssl: false
+
+external_components:
+  - source:
+      type: local
+      path: ../../components
+
+kegboard:
+  id: kb
+
+kegboard_meter:
+  - id: flow0
+    pin: 4
+    index: 0
+    total:
+      name: Ticks
+    volume:
+      name: Volume
+    flow_rate:
+      name: Flow Rate
+    pouring:
+      name: Pouring
+    on_pour_end:
+      - kegboard_meter.reset_total:
+          id: flow0
+
+kegboard_kegbot:
+  id: kegbot
+  base_url: http://kegbot.invalid
+  api_key: test
+  meters: [flow0]
+
+switch:
+  - platform: template
+    id: valve
+    name: Valve
+    optimistic: true
+
+kegboard_auth:
+  id: auth
+  kegbot_id: kegbot
+  meters: [flow0]
+  toggle: valve
+  authorized:
+    name: Authorized
+  user:
+    name: Drinker
+  on_authorized:
+    - kegboard_auth.revoke: auth
+
+# Exercises the failing instantiations: a string-arg automation calling the
+# templated actions, mirroring what rdm6300/kegboard_onewire generate.
+script:
+  - id: fake_scan
+    parameters:
+      tag: string
+    then:
+      - kegboard_auth.token_attached:
+          device: core.rfid
+          token: !lambda 'return tag;'
+      - kegboard_auth.token_detached:
+          token: !lambda 'return tag;'
+      - if:
+          condition:
+            kegboard_auth.is_authorized: auth
+          then:
+            - kegboard_meter.set_calibration:
+                id: flow0
+                value: !lambda 'return 0.5f;'

@@ -32,4 +32,4 @@ jobs:
         run: cp examples/secrets.yaml.example examples/secrets.yaml
 
       - name: Compile
-        run: esphome compile examples/kegbot-2tap.yaml
+        run: esphome compile examples/kegbot-full.yaml
