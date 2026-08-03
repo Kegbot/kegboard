@@ -28,9 +28,70 @@ void KegbotReporter::setup() {
 }
 
 void KegbotReporter::add_meter(kegboard_meter::KegboardMeter *meter) {
-  meter->add_on_pour_callback([this](const kbcore::PourRecord &record, const std::string &meter_name) {
-    this->queue_drink_(record, meter_name);
+  meter->add_on_pour_callback(
+      [this](const kbcore::PourRecord &record, const std::string &meter_name, const std::string &username) {
+        this->queue_drink_(record, meter_name, username);
+      });
+}
+
+bool KegbotReporter::lookup_token(const std::string &device, const std::string &token, std::string *username) {
+  if (this->http_request_ == nullptr)
+    return false;
+
+  const kbcore::HttpCall call = this->builder_.auth_token_get(device, token);
+
+  std::vector<http_request::Header> headers;
+  headers.push_back({"X-Kegbot-Api-Key", this->api_key_});
+
+  auto container = this->http_request_->start(call.url, call.method, "", headers);
+  if (container == nullptr) {
+    ESP_LOGW(TAG, "Token lookup failed: no response");
+    return false;
+  }
+
+  if (!http_request::is_success(container->status_code)) {
+    // 404 is the ordinary "this token is not registered" answer, not an error.
+    ESP_LOGD(TAG, "Token %s/%s not recognized (%d)", device.c_str(), token.c_str(), container->status_code);
+    container->end();
+    return false;
+  }
+
+  std::string body;
+  body.resize(container->content_length);
+  const auto result = http_request::http_read_fully(container.get(), reinterpret_cast<uint8_t *>(&body[0]), body.size(),
+                                                    512, this->http_request_->get_timeout());
+  container->end();
+
+  if (result.status != http_request::HttpReadStatus::OK) {
+    ESP_LOGW(TAG, "Token lookup failed: could not read response");
+    return false;
+  }
+
+  bool enabled = true;
+  bool ok = json::parse_json(body, [username, &enabled](JsonObject root) -> bool {
+    JsonObject object = root["object"];
+    if (object.isNull())
+      return false;
+    if (object["enabled"].is<bool>())
+      enabled = object["enabled"].as<bool>();
+    if (object["username"].is<const char *>())
+      *username = object["username"].as<const char *>();
+    return true;
   });
+
+  if (!ok) {
+    ESP_LOGW(TAG, "Token lookup returned unparseable response");
+    return false;
+  }
+
+  // A token the server knows but has disabled is a deliberate lockout.
+  if (!enabled) {
+    ESP_LOGI(TAG, "Token %s/%s is disabled", device.c_str(), token.c_str());
+    username->clear();
+    return false;
+  }
+
+  return true;
 }
 
 void KegbotReporter::add_thermo_sensor(sensor::Sensor *sensor, const std::string &name) {
@@ -49,7 +110,8 @@ uint32_t KegbotReporter::now_unix_() const {
 
 uint32_t KegbotReporter::uptime_s_() const { return millis() / 1000; }
 
-void KegbotReporter::queue_drink_(const kbcore::PourRecord &record, const std::string &meter_name) {
+void KegbotReporter::queue_drink_(const kbcore::PourRecord &record, const std::string &meter_name,
+                                  const std::string &username) {
   kbcore::DrinkReport report;
   report.meter_name = meter_name;
   report.ticks = record.ticks;
@@ -57,6 +119,7 @@ void KegbotReporter::queue_drink_(const kbcore::PourRecord &record, const std::s
   report.duration_s = (record.duration_ms + 500) / 1000;
   report.pour_time_unix = record.start_unix;
   report.tick_time_series = record.series.to_string();
+  report.username = username;
 
   // The pour started duration_ms ago, so its uptime stamp is now minus that.
   // This pair is what makes a delayed delivery land at the right time.

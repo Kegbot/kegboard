@@ -55,12 +55,22 @@ class KegboardMeter : public Component {
     this->pour_end_triggers_.push_back(trigger);
   }
 
-  /// Called with every completed pour. Reporters subscribe here rather than
-  /// being wired through YAML automations, so a pour cannot be silently
-  /// dropped by a missing `on_pour_end:` block.
-  void add_on_pour_callback(std::function<void(const kbcore::PourRecord &, const std::string &)> &&callback) {
+  /// Called with every completed pour, as (record, meter name, username).
+  /// Reporters subscribe here rather than being wired through YAML
+  /// automations, so a pour cannot be silently dropped by a missing
+  /// `on_pour_end:` block.
+  void add_on_pour_callback(
+      std::function<void(const kbcore::PourRecord &, const std::string &, const std::string &)> &&callback) {
     this->pour_callbacks_.add(std::move(callback));
   }
+
+  /// Kegbot user this meter's pours are currently attributed to, set by
+  /// kegboard_auth when a token is presented. Empty means the pour is
+  /// recorded against the guest user.
+  void set_active_username(const std::string &username) { this->active_username_ = username; }
+  const std::string &active_username() const { return this->active_username_; }
+
+  bool is_pouring() const { return this->session_.is_pouring(); }
 
   /// Meter name as Kegbot Server knows it, e.g. "kegboard-a1b2c3.flow0".
   /// Resolved on first use, since the hub's serial number is only known after
@@ -96,9 +106,11 @@ class KegboardMeter : public Component {
   sensor::Sensor *flow_rate_sensor_{nullptr};
   binary_sensor::BinarySensor *pouring_sensor_{nullptr};
 
+  std::string active_username_;
+
   std::vector<Trigger<> *> pour_start_triggers_;
   std::vector<Trigger<uint32_t, float, uint32_t> *> pour_end_triggers_;
-  CallbackManager<void(const kbcore::PourRecord &, const std::string &)> pour_callbacks_;
+  CallbackManager<void(const kbcore::PourRecord &, const std::string &, const std::string &)> pour_callbacks_;
 
   // Written by the ISR, drained by loop() under an InterruptLock.
   volatile uint32_t isr_ticks_{0};
@@ -113,19 +125,19 @@ class KegboardMeter : public Component {
 
 template<typename... Ts> class ResetTotalAction : public Action<Ts...>, public Parented<KegboardMeter> {
  public:
-  void play(Ts... x) override { this->parent_->reset_total(); }
+  void play(const Ts &...x) override { this->parent_->reset_total(); }
 };
 
 template<typename... Ts> class EndPourAction : public Action<Ts...>, public Parented<KegboardMeter> {
  public:
-  void play(Ts... x) override { this->parent_->end_pour(); }
+  void play(const Ts &...x) override { this->parent_->end_pour(); }
 };
 
 template<typename... Ts> class SetCalibrationAction : public Action<Ts...>, public Parented<KegboardMeter> {
  public:
   TEMPLATABLE_VALUE(float, ml_per_tick)
 
-  void play(Ts... x) override { this->parent_->set_ml_per_tick(this->ml_per_tick_.value(x...)); }
+  void play(const Ts &...x) override { this->parent_->set_ml_per_tick(this->ml_per_tick_.value(x...)); }
 };
 
 }  // namespace esphome::kegboard_meter

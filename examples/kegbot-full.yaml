@@ -1,0 +1,171 @@
+---
+# Everything: two taps, temperature, relays with watchdogs, a buzzer, flow
+# LEDs, and both RFID and iButton authorization gating a solenoid valve.
+#
+# More than most builds need -- it exists to show how the pieces fit together.
+# Start from kegbot-2tap.yaml and add only what you have.
+
+substitutions:
+  name: kegboard
+  friendly_name: Kegboard
+  relay_watchdog_timeout: 10s
+
+packages:
+  board: !include ../boards/esp32-s3-devkitc-1.yaml
+  base: !include ../packages/base.yaml
+  relays: !include ../packages/relays.yaml
+  buzzer: !include ../packages/buzzer.yaml
+
+external_components:
+  - source:
+      type: local
+      path: ../components
+
+kegboard:
+  id: kb
+
+# --- Taps --------------------------------------------------------------
+
+kegboard_meter:
+  - id: flow0
+    pin: ${meter0_pin}
+    index: 0
+    total:
+      name: Tap 1 Ticks
+    volume:
+      name: Tap 1 Pour Volume
+    flow_rate:
+      name: Tap 1 Flow Rate
+    pouring:
+      name: Tap 1 Pouring
+    on_pour_start:
+      - light.turn_on: tap1_led
+    on_pour_end:
+      - light.turn_off: tap1_led
+
+  - id: flow1
+    pin: ${meter1_pin}
+    index: 1
+    total:
+      name: Tap 2 Ticks
+    volume:
+      name: Tap 2 Pour Volume
+    flow_rate:
+      name: Tap 2 Flow Rate
+    pouring:
+      name: Tap 2 Pouring
+    on_pour_start:
+      - light.turn_on: tap2_led
+    on_pour_end:
+      - light.turn_off: tap2_led
+
+# --- Indicators --------------------------------------------------------
+
+output:
+  - platform: ledc
+    pin: ${led0_pin}
+    id: tap1_led_out
+  - platform: ledc
+    pin: ${led1_pin}
+    id: tap2_led_out
+
+light:
+  - platform: monochromatic
+    output: tap1_led_out
+    id: tap1_led
+    name: Tap 1 LED
+  - platform: monochromatic
+    output: tap2_led_out
+    id: tap2_led
+    name: Tap 2 LED
+
+# --- Temperature -------------------------------------------------------
+
+one_wire:
+  - platform: gpio
+    id: thermo_bus
+    pin: ${onewire_pin}
+  # A second bus for iButtons. Sharing one bus with the thermometers would
+  # work, but a separate probe keeps a wet hand away from the keg sensors.
+  - platform: gpio
+    id: auth_bus
+    pin: ${onewire_auth_pin}
+
+sensor:
+  - platform: dallas_temp
+    one_wire_id: thermo_bus
+    id: keg_temp
+    name: Keg Temperature
+    update_interval: 60s
+
+# --- Authorization -----------------------------------------------------
+
+# 125 kHz RFID. The reader is TX-only, so no pin is wired back to it.
+uart:
+  - id: rfid_uart
+    rx_pin: ${rfid_rx_pin}
+    baud_rate: 9600
+
+rdm6300:
+  id: rfid_reader
+  uart_id: rfid_uart
+  on_tag:
+    # Formatted as 8 lowercase hex digits. This string is what gets looked up
+    # on the server, so it has to match how the token was registered there --
+    # check the log line the first time you scan a fob and register that exact
+    # value, or change the format here to match what you already have.
+    - kegboard_auth.token_attached:
+        device: core.rfid
+        token: !lambda |-
+          char buf[9];
+          snprintf(buf, sizeof(buf), "%08x", x);
+          return std::string(buf);
+
+# iButtons: these report both arrival and departure, so pulling the fob
+# closes the valve immediately rather than waiting out the grant.
+kegboard_onewire:
+  - id: ibutton_reader
+    one_wire_id: auth_bus
+    update_interval: 1s
+    on_token_attached:
+      - kegboard_auth.token_attached:
+          device: onewire
+          token: !lambda 'return x;'
+    on_token_detached:
+      - kegboard_auth.token_detached:
+          token: !lambda 'return x;'
+
+kegboard_auth:
+  id: auth
+  kegbot_id: kegbot
+  meters: [flow0, flow1]
+  toggle: relay0
+  grant_duration: 30s
+  # Leave false for a party; set true to lock the tap to registered users.
+  require_known_token: false
+  authorized:
+    name: Tap Authorized
+  user:
+    name: Current Drinker
+  on_authorized:
+    - script.execute: play_auth_melody
+  on_denied:
+    - logger.log:
+        format: "Denied token %s/%s"
+        args: [device.c_str(), token.c_str()]
+        level: WARN
+
+# --- Reporting ---------------------------------------------------------
+
+kegboard_kegbot:
+  id: kegbot
+  base_url: !secret kegbot_url
+  api_key: !secret kegbot_api_key
+  meters: [flow0, flow1]
+  thermo_sensors:
+    - sensor: keg_temp
+      name: thermo-keg
+  queue_depth:
+    name: Kegbot Queue Depth
+  dropped:
+    name: Kegbot Dropped Reports

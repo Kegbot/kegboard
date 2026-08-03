@@ -183,7 +183,9 @@ async def to_code(config):
         )
 
 
-METER_ACTION_SCHEMA = cv.Schema({cv.Required(CONF_ID): cv.use_id(KegboardMeter)})
+METER_ACTION_SCHEMA = automation.maybe_simple_id(
+    {cv.GenerateID(): cv.use_id(KegboardMeter)}
+)
 
 
 @automation.register_action(

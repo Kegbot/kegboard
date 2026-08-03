@@ -41,8 +41,8 @@ Early. Under active construction — see the table below.
 | `kegboard_meter` flow meter component | Done |
 | `kegboard_kegbot` HTTP reporter | Done |
 | Temperature via stock `dallas_temp` | Works |
-| Relays, buzzer, LEDs | Planned |
-| Auth tokens (RFID, iButton) | Planned |
+| Relays with watchdog, buzzer, flow LEDs | Done |
+| Auth tokens (RFID, iButton) | Done |
 | Prebuilt binaries + web installer | Planned |
 
 Nothing has been validated against real hardware and a live Kegbot Server yet.
@@ -116,6 +116,44 @@ Actions: `kegboard_meter.reset_total`, `.end_pour`, `.set_calibration`.
 
 Optional diagnostic entities: `queue_depth`, `dropped`. A non-zero `dropped`
 means pours were lost and is worth alerting on.
+
+### `kegboard_auth`
+
+Turns token events from any reader into a grant: opens a flow toggle, and
+attributes pours to the resolved Kegbot user.
+
+| Option | Default | Notes |
+|---|---|---|
+| `meters` | `[]` | Meters this grant covers. |
+| `toggle` | — | Switch to hold on while authorized, typically a valve relay. |
+| `kegbot_id` | — | Reporter to resolve usernames through. Without it, every token pours as guest. |
+| `grant_duration` | `30s` | How long a momentary scan lasts. An active pour keeps extending it. |
+| `require_known_token` | `false` | `true` refuses unregistered tokens instead of pouring them as guest. |
+
+Actions: `kegboard_auth.token_attached` (`device`, `token`), `.token_detached`
+(`token`), `.revoke`. Condition: `.is_authorized`. Triggers: `on_authorized`,
+`on_denied`, `on_revoked`. Optional entities: `authorized`, `user`.
+
+Authorization is decided **on the device**, so the tap keeps working when the
+server is unreachable and the valve opens at local speed. The trade is that a
+token revoked server-side stays valid until it is looked up again.
+
+### `kegboard_onewire`
+
+iButton presence on a 1-Wire bus — ESPHome's `one_wire` enumerates devices but
+has no arrive/leave events. Triggers `on_token_attached` and
+`on_token_detached` with the ROM code as hex.
+
+`max_missed_searches` (default `4`) is how many consecutive misses before a
+detach is reported. A held iButton makes intermittent contact, so reporting on
+the first miss would make it flap several times a second.
+
+### Relays and buzzer
+
+`packages/relays.yaml` and `packages/buzzer.yaml` are plain YAML over stock
+components. The relay watchdog is worth keeping from the AVR firmware: a relay
+left on is usually a valve held open, so each one switches itself off after
+`relay_watchdog_timeout` (default `10s`) unless something turns it on again.
 
 ## Repository layout
 
