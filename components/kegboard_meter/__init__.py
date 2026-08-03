@@ -66,6 +66,13 @@ SetCalibrationAction = kegboard_meter_ns.class_(
 DEFAULT_ML_PER_TICK = 0.185
 
 
+def positive_nonzero_float(value):
+    value = cv.positive_float(value)
+    if value == 0:
+        raise cv.Invalid("ml_per_tick must be greater than 0")
+    return value
+
+
 def _final_validate(config):
     """Reject duplicate meter numbers across all kegboard_meter instances.
 
@@ -100,7 +107,9 @@ CONFIG_SCHEMA = cv.Schema(
         # server identifies a tap. Unrelated to the YAML `id`, which is a
         # config-internal reference and never reported anywhere.
         cv.Optional(CONF_METER_NUMBER, default=0): cv.uint8_t,
-        cv.Optional(CONF_ML_PER_TICK, default=DEFAULT_ML_PER_TICK): cv.positive_float,
+        cv.Optional(
+            CONF_ML_PER_TICK, default=DEFAULT_ML_PER_TICK
+        ): positive_nonzero_float,
         cv.Optional(
             CONF_DEBOUNCE, default="1200us"
         ): cv.positive_time_period_microseconds,

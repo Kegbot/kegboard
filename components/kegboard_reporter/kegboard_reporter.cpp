@@ -183,11 +183,10 @@ void KegboardReporter::collect_pour_updates_(std::vector<kbcore::Event> &out) {
     state.last_update_ms = now;
     state.last_update_pour_id = pour_id;
 
-    const float volume = state.meter->session_volume_ml();
-    const uint32_t duration = state.meter->session_duration_ms(now);
-    const float rate = duration > 0 ? volume * (60000.0f / duration) : -1.0f;
     out.push_back(this->make_event_(
-        "pour_update", kbcore::pour_update_data_json(state.meter->meter_number(), pour_id, volume, duration, rate)));
+        "pour_update",
+        kbcore::pour_update_data_json(state.meter->meter_number(), pour_id, state.meter->session_volume_ml(),
+                                      state.meter->session_duration_ms(now))));
   }
 }
 

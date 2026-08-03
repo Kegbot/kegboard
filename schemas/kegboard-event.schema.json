@@ -169,6 +169,7 @@
       "type": "object",
       "required": [
         "meter",
+        "pour_id",
         "volume_ml",
         "duration_ms"
       ],
@@ -237,10 +238,6 @@
         },
         "duration_ms": {
           "type": "integer",
-          "minimum": 0
-        },
-        "rate_ml_per_min": {
-          "type": "number",
           "minimum": 0
         }
       }
@@ -352,7 +349,8 @@
             "type": "object",
             "required": [
               "meter",
-              "total_ticks"
+              "total_ticks",
+              "ml_per_tick"
             ],
             "properties": {
               "meter": {

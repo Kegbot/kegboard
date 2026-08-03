@@ -57,8 +57,7 @@ struct PourData {
 
 std::string pour_data_json(const PourData &d);
 
-std::string pour_update_data_json(uint8_t meter, const std::string &pour_id, float volume_ml, uint32_t duration_ms,
-                                  float rate_ml_per_min);
+std::string pour_update_data_json(uint8_t meter, const std::string &pour_id, float volume_ml, uint32_t duration_ms);
 
 std::string temperature_data_json(const std::string &sensor, float temp_c);
 
@@ -72,6 +71,7 @@ std::string token_data_json(const std::string &auth_device, const std::string &t
 struct StatusMeter {
   uint8_t meter{0};
   uint32_t total_ticks{0};
+  /// Always emitted; the schema requires it and config validation forbids 0.
   float ml_per_tick{0.0f};
 };
 
