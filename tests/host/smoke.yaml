@@ -36,7 +36,7 @@ kegboard:
 kegboard_meter:
   - id: flow0
     pin: 4
-    index: 0
+    meter_number: 0
     total:
       name: Ticks
     volume:
@@ -49,10 +49,9 @@ kegboard_meter:
       - kegboard_meter.reset_total:
           id: flow0
 
-kegboard_kegbot:
-  id: kegbot
-  base_url: http://kegbot.invalid
-  api_key: test
+kegboard_reporter:
+  id: reporter
+  reporting_url: http://kegboard.invalid/kegboard-event
   meters: [flow0]
 
 switch:
@@ -63,9 +62,10 @@ switch:
 
 kegboard_auth:
   id: auth
-  kegbot_id: kegbot
-  meters: [flow0]
-  toggle: valve
+  mode: server
+  gates:
+    - meter: flow0
+      toggle: valve
   authorized:
     name: Authorized
   user:
@@ -84,6 +84,7 @@ script:
           device: core.rfid
           token: !lambda 'return tag;'
       - kegboard_auth.token_detached:
+          device: core.rfid
           token: !lambda 'return tag;'
       - if:
           condition:

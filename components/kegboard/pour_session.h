@@ -68,6 +68,10 @@ class PourSession {
   /// Volume of the current pour in mL. Zero when idle.
   float session_volume_ml() const { return session_ticks() * config_.ml_per_tick; }
 
+  /// Elapsed time of the current pour in ms, measured to `now_ms`. Zero when
+  /// idle. Unsigned subtraction keeps this correct across the millis wrap.
+  uint32_t session_duration_ms(uint32_t now_ms) const { return pouring_ ? now_ms - start_ms_ : 0; }
+
   /// Lifetime tick count, which survives pour boundaries and never resets
   /// except via reset_total().
   uint32_t total_ticks() const { return total_ticks_; }

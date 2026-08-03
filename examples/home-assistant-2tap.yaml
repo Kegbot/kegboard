@@ -23,7 +23,7 @@ kegboard:
 kegboard_meter:
   - id: flow0
     pin: ${meter0_pin}
-    index: 0
+    meter_number: 0
     total:
       name: Tap 1 Ticks
     volume:
@@ -37,7 +37,7 @@ kegboard_meter:
 
   - id: flow1
     pin: ${meter1_pin}
-    index: 1
+    meter_number: 1
     total:
       name: Tap 2 Ticks
     volume:

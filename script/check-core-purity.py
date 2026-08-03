@@ -23,15 +23,13 @@ CORE_FILES = [
     "pour_session.cpp",
     "tick_series.h",
     "tick_series.cpp",
-    "kegbot_request.h",
-    "kegbot_request.cpp",
     "ring_queue.h",
-    "auth_session.h",
-    "auth_session.cpp",
     "json_writer.h",
     "json_writer.cpp",
     "events.h",
     "events.cpp",
+    "grant_table.h",
+    "grant_table.cpp",
 ]
 
 FORBIDDEN = re.compile(

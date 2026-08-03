@@ -4,9 +4,9 @@
 #include <vector>
 
 #include "esphome/components/binary_sensor/binary_sensor.h"
-#include "esphome/components/kegboard/auth_session.h"
-#include "esphome/components/kegboard_kegbot/kegboard_kegbot.h"
+#include "esphome/components/kegboard/grant_table.h"
 #include "esphome/components/kegboard_meter/kegboard_meter.h"
+#include "esphome/components/kegboard_reporter/kegboard_reporter.h"
 #include "esphome/components/switch/switch.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/core/automation.h"
@@ -14,26 +14,26 @@
 
 namespace esphome::kegboard_auth {
 
-/// Fires with (device, token) when a token is accepted.
-class AuthorizedTrigger : public Trigger<std::string, std::string> {};
+/// Who decides whether a token may pour; docs/authenticated-pouring.md §2.
+enum class AuthMode : uint8_t { SERVER, LOCAL };
 
-/// Fires with (device, token) when a token is presented but refused.
-class DeniedTrigger : public Trigger<std::string, std::string> {};
+/// What happens when a token is presented while the server is unreachable.
+enum class OfflinePolicy : uint8_t { DENY, GUEST };
 
-/// Fires when a grant ends, whether by detach or by expiry.
+/// Fires with the username when a grant is applied ("" = guest).
+class AuthorizedTrigger : public Trigger<std::string> {};
+/// Fires with the server's reason (may be "") when a presentment is refused.
+class DeniedTrigger : public Trigger<std::string> {};
+/// Fires when any grant ends (detach, expiry, or deauthorize).
 class RevokedTrigger : public Trigger<> {};
 
-/// Decides who may pour.
+/// Applies authorization to taps, per docs/authenticated-pouring.md.
 ///
-/// Reader components (rdm6300, wiegand, pn532, kegboard_onewire, ...) call the
-/// token_attached/token_detached actions; this turns those events into a
-/// grant, opens the flow toggle, and attributes pours to the resolved user.
-///
-/// Authorization is resolved and enforced on the device rather than by the
-/// server. That keeps the tap working during an outage, and it means the valve
-/// opens at the speed of a local decision rather than a round trip. The cost
-/// is that a revoked token stays valid until its cached lookup is retried,
-/// which is the right trade for a kegerator.
+/// Holds no token database. In `server` mode every presentment is sent to the
+/// server, whose authorize/deny commands ride back in the same round trip; in
+/// `local` mode every token is accepted as guest. Grants are per meter, in a
+/// kbcore::GrantTable; this class drives the toggles and meter attribution
+/// that the grants imply.
 class KegboardAuth : public Component {
  public:
   void setup() override;
@@ -41,12 +41,15 @@ class KegboardAuth : public Component {
   void dump_config() override;
   float get_setup_priority() const override { return setup_priority::AFTER_CONNECTION; }
 
-  void set_kegbot(kegboard_kegbot::KegbotReporter *kegbot) { this->kegbot_ = kegbot; }
-  void set_toggle(switch_::Switch *toggle) { this->toggle_ = toggle; }
-  void set_grant_duration_ms(uint32_t ms) { this->session_.set_grant_duration_ms(ms); }
-  void set_require_known_token(bool require) { this->require_known_token_ = require; }
+  void set_reporter(kegboard_reporter::KegboardReporter *r) { this->reporter_ = r; }
+  void set_mode(AuthMode mode) { this->mode_ = mode; }
+  void set_offline_policy(OfflinePolicy p) { this->offline_policy_ = p; }
+  void set_max_grant_duration_ms(uint32_t v) { this->grants_.set_max_duration_ms(v); }
+  void set_local_grant_duration_ms(uint32_t v) { this->local_grant_duration_ms_ = v; }
 
-  void add_meter(kegboard_meter::KegboardMeter *meter) { this->meters_.push_back(meter); }
+  void add_gate(kegboard_meter::KegboardMeter *meter, switch_::Switch *toggle) {
+    this->gates_.push_back(Gate{meter, toggle});
+  }
 
   void set_authorized_binary_sensor(binary_sensor::BinarySensor *s) { this->authorized_sensor_ = s; }
   void set_user_text_sensor(text_sensor::TextSensor *s) { this->user_sensor_ = s; }
@@ -55,33 +58,47 @@ class KegboardAuth : public Component {
   void add_on_denied_trigger(DeniedTrigger *t) { this->denied_triggers_.push_back(t); }
   void add_on_revoked_trigger(RevokedTrigger *t) { this->revoked_triggers_.push_back(t); }
 
-  /// A reader saw a token.
-  void token_attached(const std::string &device, const std::string &token);
+  /// A reader saw a token arrive.
+  void token_attached(const std::string &auth_device, const std::string &token);
 
-  /// A reader saw a token leave. Momentary readers never call this; their
-  /// grants end by expiry instead.
-  void token_detached(const std::string &token);
+  /// A reader saw a token leave (presence readers only).
+  void token_detached(const std::string &auth_device, const std::string &token);
 
-  /// Drop any grant immediately, e.g. for a manual lockout.
-  void revoke();
+  /// Revoke every grant, e.g. a manual lockout.
+  void revoke_all();
 
-  bool is_authorized() const { return this->session_.is_authorized(); }
+  bool is_authorized() const { return this->grants_.any_active(); }
 
  protected:
-  void grant_(const std::string &device, const std::string &token, const std::string &username);
-  void revoke_();
+  struct Gate {
+    kegboard_meter::KegboardMeter *meter;
+    switch_::Switch *toggle;  // may be nullptr: attribution only
+  };
+
+  kegboard_reporter::CommandOutcome handle_command_(const std::string &type, JsonObjectConst data,
+                                                    std::string &message);
+
+  /// Sync toggles and meter attribution to the grant table for `meters`,
+  /// opening toggles only when `open_toggles` allows (offline-guest grants
+  /// never open valves).
+  void apply_meters_(const std::vector<uint8_t> &meters, bool open_toggles);
+  void revoke_meters_(const std::vector<uint8_t> &meters);
+  Gate *gate_for_(uint8_t meter);
+  std::vector<uint8_t> all_gate_meters_() const;
   void publish_state_();
+  void fire_denied_(const std::string &reason);
 
-  kbcore::AuthSession session_{kbcore::AuthConfig{}};
+  kbcore::GrantTable grants_;
+  kegboard_reporter::KegboardReporter *reporter_{nullptr};
+  AuthMode mode_{AuthMode::SERVER};
+  OfflinePolicy offline_policy_{OfflinePolicy::DENY};
+  uint32_t local_grant_duration_ms_{30000};
 
-  kegboard_kegbot::KegbotReporter *kegbot_{nullptr};
-  switch_::Switch *toggle_{nullptr};
-  std::vector<kegboard_meter::KegboardMeter *> meters_;
+  std::vector<Gate> gates_;
 
-  /// When true (and a server is configured) an unrecognized token is refused.
-  /// When false the token still opens the tap, and the pour is recorded
-  /// against the guest user -- which is what a party wants.
-  bool require_known_token_{false};
+  /// Set while dispatching commands from a token-ask response, so the absence
+  /// of any decision can be detected (treated as deny, per the doc).
+  bool decision_received_{false};
 
   binary_sensor::BinarySensor *authorized_sensor_{nullptr};
   text_sensor::TextSensor *user_sensor_{nullptr};
@@ -103,14 +120,17 @@ template<typename... Ts> class TokenAttachedAction : public Action<Ts...>, publi
 
 template<typename... Ts> class TokenDetachedAction : public Action<Ts...>, public Parented<KegboardAuth> {
  public:
+  TEMPLATABLE_VALUE(std::string, device)
   TEMPLATABLE_VALUE(std::string, token)
 
-  void play(const Ts &...x) override { this->parent_->token_detached(this->token_.value(x...)); }
+  void play(const Ts &...x) override {
+    this->parent_->token_detached(this->device_.value(x...), this->token_.value(x...));
+  }
 };
 
 template<typename... Ts> class RevokeAction : public Action<Ts...>, public Parented<KegboardAuth> {
  public:
-  void play(const Ts &...x) override { this->parent_->revoke(); }
+  void play(const Ts &...x) override { this->parent_->revoke_all(); }
 };
 
 template<typename... Ts> class AuthorizedCondition : public Condition<Ts...>, public Parented<KegboardAuth> {

@@ -29,7 +29,7 @@ kegboard:
 kegboard_meter:
   - id: flow0
     pin: ${meter0_pin}
-    index: 0
+    meter_number: 0
     total:
       name: Tap 1 Ticks
     volume:
@@ -45,7 +45,7 @@ kegboard_meter:
 
   - id: flow1
     pin: ${meter1_pin}
-    index: 1
+    meter_number: 1
     total:
       name: Tap 2 Ticks
     volume:
@@ -133,16 +133,20 @@ kegboard_onewire:
           token: !lambda 'return x;'
     on_token_detached:
       - kegboard_auth.token_detached:
+          device: onewire
           token: !lambda 'return x;'
 
 kegboard_auth:
   id: auth
-  kegbot_id: kegbot
-  meters: [flow0, flow1]
-  toggle: relay0
-  grant_duration: 30s
-  # Leave false for a party; set true to lock the tap to registered users.
-  require_known_token: false
+  # The server decides who may pour and which meters open; grants ride back
+  # in the same round trip as the token event. Use `mode: local` for a
+  # serverless allow-everyone setup.
+  mode: server
+  offline_policy: deny
+  gates:
+    - meter: flow0
+      toggle: relay0
+    - meter: flow1
   authorized:
     name: Tap Authorized
   user:
@@ -151,21 +155,20 @@ kegboard_auth:
     - script.execute: play_auth_melody
   on_denied:
     - logger.log:
-        format: "Denied token %s/%s"
-        args: [device.c_str(), token.c_str()]
+        format: "Denied: %s"
+        args: [reason.c_str()]
         level: WARN
 
 # --- Reporting ---------------------------------------------------------
 
-kegboard_kegbot:
-  id: kegbot
-  base_url: !secret kegbot_url
-  api_key: !secret kegbot_api_key
+kegboard_reporter:
+  id: reporter
+  reporting_url: !secret kegboard_reporting_url
   meters: [flow0, flow1]
   thermo_sensors:
     - sensor: keg_temp
       name: thermo-keg
   queue_depth:
-    name: Kegbot Queue Depth
+    name: Kegboard Queue Depth
   dropped:
-    name: Kegbot Dropped Reports
+    name: Kegboard Dropped Events

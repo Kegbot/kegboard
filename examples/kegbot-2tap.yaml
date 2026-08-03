@@ -1,8 +1,10 @@
 ---
-# Two taps reporting to a Kegbot Server, plus a keg temperature sensor.
+# Two taps reporting to a server over the Kegboard Event Protocol, plus a keg
+# temperature sensor.
 #
-# This is the flagship configuration: the board detects pours itself and posts
-# finished drinks to the server. No kegbot-pycore, no USB cable.
+# This is the flagship configuration: the board detects pours itself, posts
+# finished drinks, and pairs with the server from its dashboard -- no API key
+# to carry around, no kegbot-pycore, no USB cable.
 
 substitutions:
   name: kegboard
@@ -27,9 +29,11 @@ kegboard:
   # serial_number: kegboard-a1b2c3
 
 kegboard_meter:
+  # `id` is a YAML-internal reference and never leaves the device;
+  # `meter_number` is what the server identifies each tap by.
   - id: flow0
     pin: ${meter0_pin}
-    index: 0
+    meter_number: 0
     total:
       name: Tap 1 Ticks
     volume:
@@ -41,7 +45,7 @@ kegboard_meter:
 
   - id: flow1
     pin: ${meter1_pin}
-    index: 1
+    meter_number: 1
     total:
       name: Tap 2 Ticks
     volume:
@@ -61,15 +65,16 @@ sensor:
     name: Keg Temperature
     update_interval: 60s
 
-kegboard_kegbot:
-  id: kegbot
-  base_url: !secret kegbot_url
-  api_key: !secret kegbot_api_key
+kegboard_reporter:
+  id: reporter
+  # Full URL, path included. The device provisions its own credential by
+  # pairing: approve it on the server dashboard the first time it boots.
+  reporting_url: !secret kegboard_reporting_url
   meters: [flow0, flow1]
   thermo_sensors:
     - sensor: keg_temp
       name: thermo-keg
   queue_depth:
-    name: Kegbot Queue Depth
+    name: Kegboard Queue Depth
   dropped:
-    name: Kegbot Dropped Reports
+    name: Kegboard Dropped Events

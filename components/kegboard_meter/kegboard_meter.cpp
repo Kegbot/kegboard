@@ -1,5 +1,7 @@
 #include "kegboard_meter.h"
 
+#include "esphome/components/kegboard/events.h"
+
 #include <cinttypes>
 
 #include "esphome/core/hal.h"
@@ -32,16 +34,6 @@ void KegboardMeter::setup() {
 
   this->last_report_ms_ = millis();
   this->publish_state_(true);
-}
-
-const std::string &KegboardMeter::meter_name() {
-  if (this->meter_name_.empty()) {
-    // Matches the naming Kegbot Server expects from a controller, so a tap
-    // configured against a legacy board keeps working with a new one.
-    this->meter_name_ = this->hub_ != nullptr ? this->hub_->serial_number() : "kegboard";
-    this->meter_name_ += ".flow" + std::to_string(this->index_);
-  }
-  return this->meter_name_;
 }
 
 uint32_t KegboardMeter::take_isr_ticks_() {
@@ -83,7 +75,10 @@ void KegboardMeter::loop() {
   if (ticks > 0) {
     this->ticks_since_report_ += ticks;
     if (this->session_.add_ticks(ticks, now_ms, this->hub_ != nullptr ? this->hub_->now_unix() : 0)) {
-      ESP_LOGD(TAG, "%s: pour started", this->meter_name().c_str());
+      uint8_t random[16];
+      random_bytes(random, sizeof(random));
+      this->pour_id_ = kbcore::format_uuid4(random);
+      ESP_LOGD(TAG, "meter %u: pour started (%s)", this->meter_number_, this->pour_id_.c_str());
       for (auto *trigger : this->pour_start_triggers_)
         trigger->trigger();
       this->publish_state_(true);
@@ -101,13 +96,13 @@ void KegboardMeter::loop() {
 }
 
 void KegboardMeter::handle_pour_end_(const kbcore::PourRecord &record) {
-  ESP_LOGI(TAG, "%s: pour ended, %" PRIu32 " ticks (%.1f mL) in %" PRIu32 " ms", this->meter_name().c_str(),
+  ESP_LOGI(TAG, "meter %u: pour ended, %" PRIu32 " ticks (%.1f mL) in %" PRIu32 " ms", this->meter_number_,
            record.ticks, record.volume_ml, record.duration_ms);
 
   for (auto *trigger : this->pour_end_triggers_)
     trigger->trigger(record.ticks, record.volume_ml, record.duration_ms);
 
-  this->pour_callbacks_.call(record, this->meter_name(), this->active_username_);
+  this->pour_callbacks_.call(*this, record);
 }
 
 void KegboardMeter::publish_state_(bool force) {
@@ -146,7 +141,7 @@ void KegboardMeter::publish_state_(bool force) {
 }
 
 void KegboardMeter::dump_config() {
-  ESP_LOGCONFIG(TAG, "Kegboard Meter '%s':", this->meter_name().c_str());
+  ESP_LOGCONFIG(TAG, "Kegboard Meter %u:", this->meter_number_);
   LOG_PIN("  Pin: ", this->pin_);
   ESP_LOGCONFIG(TAG, "  Debounce: %" PRIu32 " us", this->filter_us_);
   ESP_LOGCONFIG(TAG, "  Calibration: %.4f mL/tick", this->pour_config_.ml_per_tick);

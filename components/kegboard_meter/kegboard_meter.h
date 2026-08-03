@@ -34,8 +34,7 @@ class KegboardMeter : public Component {
 
   void set_hub(kegboard::KegboardHub *hub) { this->hub_ = hub; }
   void set_pin(InternalGPIOPin *pin) { this->pin_ = pin; }
-  void set_index(uint8_t index) { this->index_ = index; }
-  void set_meter_name(const std::string &name) { this->meter_name_ = name; }
+  void set_meter_number(uint8_t meter_number) { this->meter_number_ = meter_number; }
   void set_filter_us(uint32_t filter_us) { this->filter_us_ = filter_us; }
   void set_report_interval_ms(uint32_t interval) { this->report_interval_ms_ = interval; }
 
@@ -55,27 +54,39 @@ class KegboardMeter : public Component {
     this->pour_end_triggers_.push_back(trigger);
   }
 
-  /// Called with every completed pour, as (record, meter name, username).
-  /// Reporters subscribe here rather than being wired through YAML
-  /// automations, so a pour cannot be silently dropped by a missing
-  /// `on_pour_end:` block.
-  void add_on_pour_callback(
-      std::function<void(const kbcore::PourRecord &, const std::string &, const std::string &)> &&callback) {
+  /// Called with every completed pour. The meter reference gives access to
+  /// pour_id, meter number, and attribution at pour end. Reporters subscribe here
+  /// rather than being wired through YAML automations, so a pour cannot be
+  /// silently dropped by a missing `on_pour_end:` block.
+  void add_on_pour_callback(std::function<void(KegboardMeter &, const kbcore::PourRecord &)> &&callback) {
     this->pour_callbacks_.add(std::move(callback));
   }
 
-  /// Kegbot user this meter's pours are currently attributed to, set by
-  /// kegboard_auth when a token is presented. Empty means the pour is
-  /// recorded against the guest user.
-  void set_active_username(const std::string &username) { this->active_username_ = username; }
-  const std::string &active_username() const { return this->active_username_; }
+  /// Attribution for pours on this meter, set by kegboard_auth while a grant
+  /// is active. Empty user means guest.
+  void set_active_auth(const std::string &user, const std::string &auth_device, const std::string &token) {
+    this->active_user_ = user;
+    this->active_auth_device_ = auth_device;
+    this->active_auth_token_ = token;
+  }
+  void clear_active_auth() { this->set_active_auth("", "", ""); }
+  const std::string &active_user() const { return this->active_user_; }
+  const std::string &active_auth_device() const { return this->active_auth_device_; }
+  const std::string &active_auth_token() const { return this->active_auth_token_; }
 
   bool is_pouring() const { return this->session_.is_pouring(); }
 
-  /// Meter name as Kegbot Server knows it, e.g. "kegboard-a1b2c3.flow0".
-  /// Resolved on first use, since the hub's serial number is only known after
-  /// its setup() has run.
-  const std::string &meter_name();
+  /// The protocol's meter number: `(device, meter_number)` identifies a tap
+  /// server-side. Unrelated to the YAML `id`, which is never on the wire.
+  uint8_t meter_number() const { return this->meter_number_; }
+
+  /// Protocol pour id of the in-progress (or just-ended, during the pour
+  /// callback) pour. Generated fresh at each pour start.
+  const std::string &pour_id() const { return this->pour_id_; }
+
+  /// Live pour figures for pour_update events.
+  float session_volume_ml() const { return this->session_.session_volume_ml(); }
+  uint32_t session_duration_ms(uint32_t now_ms) const { return this->session_.session_duration_ms(now_ms); }
 
   float ml_per_tick() const { return this->pour_config_.ml_per_tick; }
   uint32_t total_ticks() const { return this->session_.total_ticks(); }
@@ -94,8 +105,7 @@ class KegboardMeter : public Component {
 
   kegboard::KegboardHub *hub_{nullptr};
   InternalGPIOPin *pin_{nullptr};
-  uint8_t index_{0};
-  std::string meter_name_;
+  uint8_t meter_number_{0};
 
   kbcore::PourConfig pour_config_;
   kbcore::PourSession session_{kbcore::PourConfig{}};
@@ -106,11 +116,14 @@ class KegboardMeter : public Component {
   sensor::Sensor *flow_rate_sensor_{nullptr};
   binary_sensor::BinarySensor *pouring_sensor_{nullptr};
 
-  std::string active_username_;
+  std::string active_user_;
+  std::string active_auth_device_;
+  std::string active_auth_token_;
+  std::string pour_id_;
 
   std::vector<Trigger<> *> pour_start_triggers_;
   std::vector<Trigger<uint32_t, float, uint32_t> *> pour_end_triggers_;
-  CallbackManager<void(const kbcore::PourRecord &, const std::string &, const std::string &)> pour_callbacks_;
+  CallbackManager<void(KegboardMeter &, const kbcore::PourRecord &)> pour_callbacks_;
 
   // Written by the ISR, drained by loop() under an InterruptLock.
   volatile uint32_t isr_ticks_{0};

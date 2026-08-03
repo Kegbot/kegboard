@@ -20,12 +20,18 @@ whenever the host was down.
 
 Kegboard 2.x is a networked appliance:
 
-- **Pours are assembled on the device.** The board detects the start and end of
-  a pour, applies calibration, and posts a finished drink to Kegbot Server.
-- **Outages are survivable.** Undelivered pours are buffered and retried. Kegbot
-  Server's API records a pour by *elapsed time*, so a pour delivered an hour
-  late still lands with the correct timestamp — even on a board whose clock
-  never synced.
+- **Pours are assembled on the device.** The board detects the start and end
+  of a pour, applies its own calibration, and reports a finished pour with an
+  authoritative `volume_ml`.
+- **One simple protocol.** Everything is JSON batches to a single endpoint
+  (`POST /kegboard-event`), specified in
+  [docs/kegboard-event-protocol.md](docs/kegboard-event-protocol.md) with
+  normative JSON Schemas. Any server can implement it.
+- **Outages are survivable.** Events queue and deliver late with correct
+  timestamps — even on a board whose clock never synced — and retries can
+  never create a duplicate drink.
+- **No API keys to carry around.** An unprovisioned board shows up on the
+  server dashboard by name; click allow and it provisions itself.
 - **No `kegbot-pycore`, no USB cable.** WiFi and HTTP.
 - **It's ESPHome.** Adding a display, a pressure sensor, a second thermometer,
   or a different RFID reader is YAML you write, not a firmware release we ship.
@@ -36,13 +42,14 @@ Early. Under active construction — see the table below.
 
 | Area | State |
 |---|---|
-| Core pour logic (state machine, tick series, queue, API requests) | Done, unit tested |
-| `kegboard` hub component | Done |
-| `kegboard_meter` flow meter component | Done |
-| `kegboard_kegbot` HTTP reporter | Done |
+| Core logic (pour detection, event protocol, grants) | Done, unit tested |
+| `kegboard` hub + `kegboard_meter` | Done |
+| `kegboard_reporter` (event protocol, pairing, commands) | Done |
+| `kegboard_auth` (server-decided grants, local mode) | Done |
 | Temperature via stock `dallas_temp` | Works |
 | Relays with watchdog, buzzer, flow LEDs | Done |
-| Auth tokens (RFID, iButton) | Done |
+| Auth readers (RFID, iButton) | Done |
+| Server implementing the protocol | In progress (kegbot-server) |
 | Prebuilt binaries + web installer | Planned |
 
 Nothing has been validated against real hardware and a live Kegbot Server yet.
@@ -52,7 +59,7 @@ planned.
 
 ## Configuration
 
-A minimal two-tap board reporting to a Kegbot Server:
+A minimal two-tap board reporting to a server:
 
 ```yaml
 external_components:
@@ -70,9 +77,8 @@ kegboard_meter:
     pouring:
       name: Tap 1 Pouring
 
-kegboard_kegbot:
-  base_url: !secret kegbot_url
-  api_key: !secret kegbot_api_key
+kegboard_reporter:
+  reporting_url: !secret kegboard_reporting_url
   meters: [flow0]
 ```
 
@@ -82,16 +88,15 @@ See `examples/` for complete configs, and `boards/` for pin maps.
 
 | Option | Default | Notes |
 |---|---|---|
-| `serial_number` | `kegboard-<mac>` | Board identity. Meters are named `<serial>.flow<index>`, which is how Kegbot Server keys a tap — set it explicitly to adopt a replaced board's identity. |
+| `serial_number` | `kegboard-<mac>` | Device identity in the protocol. Set explicitly to adopt a replaced board's identity. |
 
 ### `kegboard_meter`
 
 | Option | Default | Notes |
 |---|---|---|
 | `pin` | required | Meter input. Pulled up internally; counts falling edges. |
-| `index` | `0` | Used to build the default meter name. |
-| `meter_name` | `<serial>.flow<index>` | Override to match an existing server-side meter. |
-| `ml_per_tick` | `0.185` | SwissFlow SF800 and clones (~5.4 ticks/mL). |
+| `meter_number` | `0` | The protocol's meter number: `(device, meter_number)` identifies a tap server-side. Must be unique per meter (validated at build). The YAML `id` is a config-internal reference and is never reported. |
+| `ml_per_tick` | `0.185` | SwissFlow SF800 and clones (~5.4 ticks/mL). The device's calibration is authoritative: reported volume comes from this. |
 | `debounce` | `1200us` | Matches the legacy firmware's filter. |
 | `idle_timeout` | `10s` | Silence after which a pour is considered finished. |
 | `min_pour_ticks` | `3` | Anything shorter is treated as a drip and discarded. |
@@ -103,40 +108,40 @@ Optional entities: `total`, `volume`, `flow_rate`, `pouring`.
 Triggers: `on_pour_start`, `on_pour_end` (with `ticks`, `volume_ml`, `duration_ms`).
 Actions: `kegboard_meter.reset_total`, `.end_pour`, `.set_calibration`.
 
-### `kegboard_kegbot`
+### `kegboard_reporter`
+
+Speaks the [Kegboard Event Protocol](docs/kegboard-event-protocol.md).
 
 | Option | Default | Notes |
 |---|---|---|
-| `base_url` | required | Server root. A trailing `/` or `/api` is accepted. |
-| `api_key` | required | Sent as `X-Kegbot-Api-Key`; needs a staff/superuser key. |
-| `meters` | `[]` | Meter IDs whose pours are reported. |
+| `reporting_url` | required | Full URL, path included, e.g. `https://kegbot.example.com/api/kegboard-event`. No credential is configured — the device provisions its own bearer token by pairing via the server dashboard, and it persists in flash. |
+| `meters` | `[]` | Meters whose pours are reported. |
 | `thermo_sensors` | `[]` | `sensor:`/`name:` pairs; any ESPHome sensor works. |
-| `send_volume` | `false` | Off so the server's own per-meter calibration stays authoritative. |
+| `heartbeat_interval` | `60s` | Status event cadence; also bounds worst-case command latency. |
+| `pour_update_interval` | `1s` | Live `pour_update` cadence; `0s` disables. |
 | `retry_interval` | `30s` | Base for exponential backoff, capped at 5 min. |
 
 Optional diagnostic entities: `queue_depth`, `dropped`. A non-zero `dropped`
-means pours were lost and is worth alerting on.
+means events were lost and is worth alerting on.
 
 ### `kegboard_auth`
 
-Turns token events from any reader into a grant: opens a flow toggle, and
-attributes pours to the resolved Kegbot user.
+Applies [authenticated pouring](docs/authenticated-pouring.md): per-meter
+grants, decided by the server (or locally), driving valve toggles and pour
+attribution.
 
 | Option | Default | Notes |
 |---|---|---|
-| `meters` | `[]` | Meters this grant covers. |
-| `toggle` | — | Switch to hold on while authorized, typically a valve relay. |
-| `kegbot_id` | — | Reporter to resolve usernames through. Without it, every token pours as guest. |
-| `grant_duration` | `30s` | How long a momentary scan lasts. An active pour keeps extending it. |
-| `require_known_token` | `false` | `true` refuses unregistered tokens instead of pouring them as guest. |
+| `mode` | `server` | `server`: every token presentment is decided by the server, which chooses the meters, user, and duration. `local`: every token pours as guest, serverlessly. |
+| `gates` | `[]` | `meter:` plus optional `toggle:` (valve relay). A gate without a toggle gets attribution only. |
+| `offline_policy` | `deny` | Token presented while the server is unreachable: `deny`, or `guest` (attribution only — never opens valves). |
+| `max_grant_duration` | `5min` | Device-side clamp on server-issued grants: the final bound on valve-open time. |
+| `local_grant_duration` | `30s` | Grant length in `local` mode and for offline-guest grants. |
 
-Actions: `kegboard_auth.token_attached` (`device`, `token`), `.token_detached`
-(`token`), `.revoke`. Condition: `.is_authorized`. Triggers: `on_authorized`,
-`on_denied`, `on_revoked`. Optional entities: `authorized`, `user`.
-
-Authorization is decided **on the device**, so the tap keeps working when the
-server is unreachable and the valve opens at local speed. The trade is that a
-token revoked server-side stays valid until it is looked up again.
+Actions: `kegboard_auth.token_attached` / `.token_detached` (`device`,
+`token`), `.revoke`. Condition: `.is_authorized`. Triggers: `on_authorized`
+(`user`), `on_denied` (`reason`), `on_revoked`. Optional entities:
+`authorized`, `user`.
 
 ### `kegboard_onewire`
 
@@ -160,10 +165,14 @@ left on is usually a valve held open, so each one switches itself off after
 ```
 components/     ESPHome external components (this repo is the component source)
   kegboard/     Hub component + the framework-agnostic core (see CORE.md)
-  kegboard_meter/   Flow meter and pour detection
-  kegboard_kegbot/  Kegbot Server reporter
+  kegboard_meter/     Flow meter and pour detection
+  kegboard_reporter/  Event protocol client (batching, pairing, commands)
+  kegboard_auth/      Per-meter authorization
+  kegboard_onewire/   iButton presence
 packages/       Composable YAML users include
 boards/         Pin maps per target board
+docs/           Protocol specifications
+schemas/        Normative JSON Schemas for the protocol
 examples/       Worked configurations
 tests/core/     Host unit tests -- plain g++, no hardware, no toolchain
 script/         CI helpers

@@ -10,7 +10,6 @@ from esphome.components import binary_sensor, sensor
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_ID,
-    CONF_INDEX,
     CONF_PIN,
     CONF_TRIGGER_ID,
     CONF_VALUE,
@@ -18,6 +17,7 @@ from esphome.const import (
     STATE_CLASS_MEASUREMENT,
     STATE_CLASS_TOTAL_INCREASING,
 )
+import esphome.final_validate as fv
 
 from ..kegboard import CONF_KEGBOARD_ID, KegboardHub
 
@@ -30,7 +30,7 @@ CONF_DEBOUNCE = "debounce"
 CONF_FLOW_RATE = "flow_rate"
 CONF_IDLE_TIMEOUT = "idle_timeout"
 CONF_MAX_POUR_DURATION = "max_pour_duration"
-CONF_METER_NAME = "meter_name"
+CONF_METER_NUMBER = "meter_number"
 CONF_MIN_POUR_TICKS = "min_pour_ticks"
 CONF_ML_PER_TICK = "ml_per_tick"
 CONF_ON_POUR_END = "on_pour_end"
@@ -66,11 +66,29 @@ SetCalibrationAction = kegboard_meter_ns.class_(
 DEFAULT_ML_PER_TICK = 0.185
 
 
-def validate_meter_name(value):
-    value = cv.string_strict(value)
-    if any(c.isspace() for c in value):
-        raise cv.Invalid("Meter name must not contain whitespace")
-    return value
+def _final_validate(config):
+    """Reject duplicate meter numbers across all kegboard_meter instances.
+
+    The default is 0, so a multi-meter config that forgets to set
+    meter_number would otherwise report every tap as meter 0 and the server
+    would silently merge them.
+    """
+    full = fv.full_config.get()
+    seen = {}
+    for meter in full.get("kegboard_meter", []):
+        number = meter[CONF_METER_NUMBER]
+        if number in seen:
+            raise cv.Invalid(
+                f"Duplicate meter_number {number}: used by both "
+                f"'{seen[number]}' and '{meter[CONF_ID]}'. Each meter needs "
+                "a unique meter_number; it is what the server identifies the "
+                "tap by."
+            )
+        seen[number] = meter[CONF_ID]
+    return config
+
+
+FINAL_VALIDATE_SCHEMA = _final_validate
 
 
 CONFIG_SCHEMA = cv.Schema(
@@ -78,10 +96,10 @@ CONFIG_SCHEMA = cv.Schema(
         cv.GenerateID(): cv.declare_id(KegboardMeter),
         cv.GenerateID(CONF_KEGBOARD_ID): cv.use_id(KegboardHub),
         cv.Required(CONF_PIN): pins.internal_gpio_input_pin_schema,
-        # Defaults to "<board serial>.flow<index>", which is what Kegbot Server
-        # expects a controller to call its meters.
-        cv.Optional(CONF_METER_NAME): validate_meter_name,
-        cv.Optional(CONF_INDEX, default=0): cv.uint8_t,
+        # The protocol's meter number: (device, meter_number) is how the
+        # server identifies a tap. Unrelated to the YAML `id`, which is a
+        # config-internal reference and never reported anywhere.
+        cv.Optional(CONF_METER_NUMBER, default=0): cv.uint8_t,
         cv.Optional(CONF_ML_PER_TICK, default=DEFAULT_ML_PER_TICK): cv.positive_float,
         cv.Optional(
             CONF_DEBOUNCE, default="1200us"
@@ -137,9 +155,7 @@ async def to_code(config):
     pin = await cg.gpio_pin_expression(config[CONF_PIN])
     cg.add(var.set_pin(pin))
 
-    cg.add(var.set_index(config[CONF_INDEX]))
-    if CONF_METER_NAME in config:
-        cg.add(var.set_meter_name(config[CONF_METER_NAME]))
+    cg.add(var.set_meter_number(config[CONF_METER_NUMBER]))
 
     cg.add(var.set_ml_per_tick(config[CONF_ML_PER_TICK]))
     cg.add(var.set_filter_us(config[CONF_DEBOUNCE]))

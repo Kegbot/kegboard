@@ -51,6 +51,10 @@ template<typename T, size_t N> class RingQueue {
   /// Oldest item, or nullptr when empty. Valid until the next mutation.
   const T *peek() const { return this->size_ == 0 ? nullptr : &this->items_[this->head_]; }
 
+  /// Item `i` positions from the oldest, or nullptr past the end. Lets a
+  /// sender assemble a batch without popping anything until it is accepted.
+  const T *at(size_t i) const { return i >= this->size_ ? nullptr : &this->items_[(this->head_ + i) % N]; }
+
   /// Remove the oldest item, optionally copying it to `out`.
   bool pop(T *out = nullptr) {
     if (this->size_ == 0)
