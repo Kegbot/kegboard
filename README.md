@@ -199,6 +199,24 @@ $ pip install pre-commit && pre-commit install
 $ pre-commit run --all-files
 ```
 
+## Simulator
+
+`tools/kegboard-sim.py` is a TUI kegboard for developing receivers without
+hardware. It speaks the full protocol — pairing, batching, `age_ms`,
+commands, dedup — and validates every outgoing batch against the schemas, so
+it cannot teach a server the wrong protocol.
+
+```console
+$ uv run tools/kegboard-sim.py http://localhost:8000/kegboard-event
+```
+
+Single keys drive it: pour a beer (with live `pour_update`s), toggle
+temperature logging, present preset tokens (including an unknown fob and a
+presence-style iButton), kill the heartbeat so your server's liveness check
+can notice, go offline to build a backlog that delivers late with correct
+ages, replay the last batch verbatim to exercise dedup, send an
+unknown event type, and reboot to reset `boot_id`.
+
 ## Debugging
 
 The reporter logs one line per delivery at `DEBUG` (status, event count,
