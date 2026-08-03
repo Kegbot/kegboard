@@ -39,7 +39,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Footer, Header, OptionList, RichLog, Static
 from textual.widgets.option_list import Option
 
-FW_VERSION = "2.0.0-sim"
+FW_VERSION = "4.0.0-sim"
 QUEUE_CAPACITY = 16
 POUR_UPDATE_INTERVAL_S = 1.0
 PAIRING_POLL_S = 5.0

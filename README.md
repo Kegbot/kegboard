@@ -4,10 +4,10 @@ Kegboard is the kegerator controller firmware from the [Kegbot][kegbot] project.
 It reads flow meters, temperature sensors, and auth tokens, drives valves and
 relays, and reports pours to a [Kegbot Server][kegbot-server].
 
-This is **Kegboard 2.x**, a ground-up rewrite for **ESP32** built on
+This is **Kegboard v4**, a ground-up rewrite for **ESP32** built on
 [ESPHome][esphome].
 
-> **Looking for the Arduino version?** The original AVR firmware lives on the
+> **Looking for the Arduino version?** The v2/v3 firmware lives on the
 > [`arduino`](https://github.com/Kegbot/kegboard/tree/arduino) branch. It is
 > feature-frozen and does not speak the same protocol as this one.
 
@@ -18,7 +18,7 @@ serial, and a host daemon (`kegbot-pycore`) assembled those ticks into pours and
 posted them to the server. That meant a cable, a always-on host, and a lost pour
 whenever the host was down.
 
-Kegboard 2.x is a networked appliance:
+Kegboard v4 is a networked appliance:
 
 - **Pours are assembled on the device.** The board detects the start and end
   of a pour, applies its own calibration, and reports a finished pour with an
@@ -244,9 +244,21 @@ hall-effect sensors, which are safe on a 3.3 V pull-up because they only ever
 pull the line to ground. Meters with a push-pull 5 V output will damage the
 ESP32 and need a level shifter or divider. Check your meter before wiring it.
 
+## History
+
+Kegboard was created in 2004 and has received several major updates over the
+years:
+
+- **v1 (2004)** — PIC16-based, written in the JAL programming language.
+- **v2 (~2009)** — rewritten for Arduino, introducing the KBSP serial
+  protocol.
+- **v3 (2014)** — the Kegboard Pro Mini, a fully-assembled Arduino-based
+  board.
+- **v4 (2026)** — this ground-up ESP32 rewrite on ESPHome.
+
 ## License and copyright
 
-Kegboard 2.x is offered under the **MIT** license, matching the rest of the
+Kegboard v4 is offered under the **MIT** license, matching the rest of the
 Kegbot project; see `LICENSE.txt`.
 
 Two notes on what that does and doesn't cover:

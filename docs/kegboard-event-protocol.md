@@ -6,7 +6,7 @@
 
 The protocol a Kegboard controller uses to talk to a server. It replaces both
 the legacy KBSP serial protocol and the legacy pykeg HTTP API; neither
-survives in Kegboard 2.x.
+survives in Kegboard v4.
 
 Companion document: [Authenticated Pouring](authenticated-pouring.md), which
 specifies how token presentment, server-side authorization, and valve control
@@ -262,7 +262,7 @@ visible and for letting the server discover device settings it cannot set.
 ```json
 {
   "state": "boot",
-  "fw_version": "2.0.0",
+  "fw_version": "4.0.0",
   "uptime_ms": 12345,
   "wifi_rssi_dbm": -61,
   "events_dropped": 0,
@@ -461,7 +461,7 @@ Content-Type: application/json
       "time": "2026-08-03T18:02:11Z",
       "data": {
         "state": "heartbeat",
-        "fw_version": "2.0.0",
+        "fw_version": "4.0.0",
         "uptime_ms": 7523000,
         "events_dropped": 0,
         "config": { "heartbeat_ms": 60000, "pour_update_ms": 1000, "queue_capacity": 16 },
