@@ -26,6 +26,8 @@ CORE_FILES = [
     "kegbot_request.h",
     "kegbot_request.cpp",
     "ring_queue.h",
+    "auth_session.h",
+    "auth_session.cpp",
 ]
 
 FORBIDDEN = re.compile(
