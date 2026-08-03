@@ -91,7 +91,10 @@ class KegboardReporter : public Component {
   void dispatch_commands_(const std::string &body);
   void handle_pairing_(const std::string &body);
 
-  bool healthy_() const { return this->is_paired() && this->consecutive_failures_ == 0; }
+  /// Deliveries are currently succeeding. Deliberately not conditioned on
+  /// is_paired(): against a server that never asks for auth, the device runs
+  /// unpaired forever and must still behave fully (protocol §2).
+  bool healthy_() const { return !this->denied_ && this->consecutive_failures_ == 0; }
   void bump_backoff_();
   void publish_diagnostics_();
   void load_token_();

@@ -48,13 +48,29 @@ Content-Type: application/json
 
 - The reporting URL — path included — is device configuration, used verbatim;
   the device attaches no meaning to it. Servers SHOULD expose the endpoint at
-  a stable, documented path such as `/kegboard-event`. The bearer token is
-  provisioned by pairing (§8).
-- TLS is strongly recommended; the token is a plain bearer credential.
+  a stable, documented path such as `/kegboard-event`.
 - The request body is a single JSON object (§3); the response body is a
   single JSON object (§7).
 - Maximum request body size a server must accept: **16 KiB**. The device
   bounds itself well under this.
+
+### Authentication
+
+Authentication is optional, and the server drives it:
+
+- A device holding a bearer token sends `Authorization: Bearer <token>` on
+  every request. A device without one sends **no `Authorization` header at
+  all** — there is no placeholder, no empty header, no handshake.
+- A server MAY simply accept (2xx) unauthenticated batches. The device then
+  never pairs and never holds a token. This is deliberate: the minimum
+  viable receiver is a single unauthenticated HTTP handler with no auth
+  machinery whatsoever.
+- **Only a 401 introduces authentication.** A 401 tells the device this
+  server wants a credential, sending it into pairing (§8); once provisioned,
+  every subsequent request carries the header. The same 401 later serves as
+  revocation — the device drops its token and re-pairs.
+- TLS is strongly recommended whenever tokens are in play; the token is a
+  plain bearer credential.
 
 ### Status-code semantics
 
@@ -337,7 +353,9 @@ server dashboard **by name**; a human clicks allow or deny.
 
 An unprovisioned device sends ordinary batches (at minimum its `status`
 events — pours queue as usual and deliver after pairing) with **no
-`Authorization` header**. The server responds `401` with a pairing body:
+`Authorization` header**. A server that does not require authentication
+simply accepts them, and pairing never begins (§2). A server that requires
+authentication responds `401` with a pairing body:
 
 ```json
 { "pairing": { "state": "pending" } }
