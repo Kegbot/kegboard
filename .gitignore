@@ -10,6 +10,9 @@ secrets.yaml
 # Host test build output
 tests/core/build/
 
+# Sphinx build output
+docs/_build/
+
 # Editors / OS
 .DS_Store
 compile_commands.json

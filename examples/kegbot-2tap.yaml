@@ -11,7 +11,7 @@ substitutions:
   friendly_name: Kegboard
 
 packages:
-  board: !include ../boards/esp32-s3-devkitc-1.yaml
+  board: !include ../boards/esp32-devkit.yaml
   base: !include ../packages/base.yaml
 
 external_components:

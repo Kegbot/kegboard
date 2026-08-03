@@ -1,0 +1,17 @@
+# The docs toolchain, managed by uv. This is a virtual project (nothing is
+# packaged): `uv run`/`uv sync` here install Sphinx and friends from uv.lock.
+
+[project]
+name = "kegboard-docs"
+version = "0.0.0"
+description = "Sphinx project for the Kegboard manual."
+requires-python = ">=3.11"
+dependencies = [
+    "furo",
+    "myst-parser",
+    "sphinx",
+    "sphinx-autobuild",
+]
+
+[tool.uv]
+package = false
