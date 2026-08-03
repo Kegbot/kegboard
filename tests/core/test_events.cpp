@@ -75,7 +75,7 @@ TEST(token_data_status_absent_means_server_decides) {
 TEST(status_data_includes_config_always) {
   StatusData d;
   d.boot = true;
-  d.fw_version = "2.0.0";
+  d.fw_version = "4.0.0";
   d.uptime_ms = 1234;
   d.events_dropped = 0;
   d.heartbeat_ms = 60000;
@@ -171,7 +171,7 @@ static int emit_samples(const char *dir) {
 
   StatusData st;
   st.boot = false;
-  st.fw_version = "2.0.0";
+  st.fw_version = "4.0.0";
   st.uptime_ms = 7523000;
   st.has_rssi = true;
   st.rssi_dbm = -61;
