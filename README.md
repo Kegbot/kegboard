@@ -199,6 +199,26 @@ $ pip install pre-commit && pre-commit install
 $ pre-commit run --all-files
 ```
 
+## Debugging
+
+The reporter logs one line per delivery at `DEBUG` (status, event count,
+bytes). To see the actual protocol traffic — every request and response body,
+including `pour_update`s while beer is flowing — raise its log level to
+`VERY_VERBOSE`:
+
+```yaml
+logger:
+  logs:
+    kegboard_reporter: VERY_VERBOSE
+```
+
+Then attach with `esphome logs <config>.yaml`. Two notes:
+
+- `VERY_VERBOSE` lines are compiled out at default log levels, so production
+  builds pay nothing for this machinery.
+- The logger truncates lines to its buffer (default 512 bytes); a full batch
+  body will clip. Add `logger: { tx_buffer_size: 2048 }` if that bites.
+
 ## Hardware notes
 
 **ESP32 GPIOs are not 5 V tolerant.** Most beer flow meters are open-collector
