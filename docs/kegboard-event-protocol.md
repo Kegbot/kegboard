@@ -146,6 +146,12 @@ Every element of `events`:
 
 A completed pour: the durable record. Emitted once, when the pour ends.
 
+Like every event, a pour is timed by the envelope's `age_ms` (§4, §6) — there
+is no separate timestamp in the payload, and queued pours delivered late keep
+correct timing automatically. The anchor is the **end of the pour**: the
+event is created the moment the pour finishes, so
+`pour_end = server_now - age_ms`, and the start is `pour_end - duration_ms`.
+
 ```json
 {
   "meter": 0,
