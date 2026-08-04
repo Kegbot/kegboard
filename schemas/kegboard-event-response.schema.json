@@ -24,7 +24,57 @@
           "data": {
             "type": "object"
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "authorize"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "data": {
+                  "$ref": "#/$defs/authorize"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "deny"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "data": {
+                  "$ref": "#/$defs/deny"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "deauthorize"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "data": {
+                  "$ref": "#/$defs/deauthorize"
+                }
+              }
+            }
+          }
+        ]
       }
     },
     "pairing": {
@@ -57,6 +107,64 @@
           "state",
           "token"
         ]
+      }
+    }
+  },
+  "$defs": {
+    "authorize": {
+      "type": "object",
+      "required": [
+        "meter_numbers",
+        "duration_ms"
+      ],
+      "properties": {
+        "meter_numbers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "user": {
+          "type": "string"
+        },
+        "duration_ms": {
+          "type": "integer",
+          "exclusiveMinimum": 0
+        },
+        "auth_device": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        }
+      }
+    },
+    "deny": {
+      "type": "object",
+      "properties": {
+        "auth_device": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
+    },
+    "deauthorize": {
+      "type": "object",
+      "properties": {
+        "meter_numbers": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
       }
     }
   }
