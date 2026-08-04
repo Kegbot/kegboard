@@ -168,13 +168,13 @@
     "pour": {
       "type": "object",
       "required": [
-        "meter",
+        "meter_number",
         "pour_id",
         "volume_ml",
         "duration_ms"
       ],
       "properties": {
-        "meter": {
+        "meter_number": {
           "type": "integer",
           "minimum": 0
         },
@@ -217,13 +217,13 @@
     "pour_update": {
       "type": "object",
       "required": [
-        "meter",
+        "meter_number",
         "pour_id",
         "volume_ml",
         "duration_ms"
       ],
       "properties": {
-        "meter": {
+        "meter_number": {
           "type": "integer",
           "minimum": 0
         },
@@ -348,12 +348,12 @@
           "items": {
             "type": "object",
             "required": [
-              "meter",
+              "meter_number",
               "total_ticks",
               "ml_per_tick"
             ],
             "properties": {
-              "meter": {
+              "meter_number": {
                 "type": "integer",
                 "minimum": 0
               },
@@ -364,6 +364,21 @@
               "ml_per_tick": {
                 "type": "number",
                 "exclusiveMinimum": 0
+              }
+            }
+          }
+        },
+        "relays": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "relay_number"
+            ],
+            "properties": {
+              "relay_number": {
+                "type": "integer",
+                "minimum": 0
               }
             }
           }

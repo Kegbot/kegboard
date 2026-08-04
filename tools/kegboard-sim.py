@@ -301,7 +301,7 @@ class Simulator:
 
     def _apply_command(self, cmd_type: str, data: dict) -> str:
         if cmd_type == "authorize":
-            meters = data.get("meters")
+            meters = data.get("meter_numbers")
             if not isinstance(meters, list) or "duration_ms" not in data:
                 return "error"
             for meter in meters:
@@ -318,7 +318,7 @@ class Simulator:
             self.log(f"[yellow]denied: {data.get('reason', '(no reason)')}[/]")
             return "ok"
         if cmd_type == "deauthorize":
-            meters = data.get("meters", list(self.grants))
+            meters = data.get("meter_numbers", list(self.grants))
             for meter in meters:
                 self.grants.pop(meter, None)
             self.log(f"[yellow]deauthorized meters {meters}[/]")
@@ -354,7 +354,7 @@ class Simulator:
                 update = self.make_event(
                     "pour_update",
                     {
-                        "meter": meter,
+                        "meter_number": meter,
                         "pour_id": pour_id,
                         "volume_ml": round(poured, 3),
                         "duration_ms": int((step + 1) * POUR_UPDATE_INTERVAL_S * 1000),
@@ -365,7 +365,7 @@ class Simulator:
         ticks = int(volume_ml / self.ml_per_tick)
         self.totals[meter] = self.totals.get(meter, 0) + ticks
         data = {
-            "meter": meter,
+            "meter_number": meter,
             "pour_id": pour_id,
             "volume_ml": round(volume_ml, 3),
             "duration_ms": int(duration_s * 1000),
@@ -397,9 +397,10 @@ class Simulator:
                     "queue_capacity": QUEUE_CAPACITY,
                 },
                 "meters": [
-                    {"meter": m, "total_ticks": t, "ml_per_tick": self.ml_per_tick}
+                    {"meter_number": m, "total_ticks": t, "ml_per_tick": self.ml_per_tick}
                     for m, t in sorted(self.totals.items())
                 ],
+                "relays": [{"relay_number": m} for m in sorted(self.totals)],
             },
         )
 

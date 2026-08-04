@@ -44,7 +44,7 @@ holds no token database, only the currently active grant(s).
    in the same HTTP response — with an `authorize` or a `deny` command.
    Servers SHOULD always answer a decision-requesting token event with one
    of the two.
-3. **Device acts.** On `authorize`, the device opens the toggles for the
+3. **Device acts.** On `authorize`, the device opens the relays for the
    named meters, attributes subsequent pours to the given user, and
    acknowledges with a `command_result` event. On `deny`, the tap stays
    closed and the device SHOULD signal the user (e.g. a refusal tone). If
@@ -84,7 +84,7 @@ reader              device                                server
   "id": "cmd_8f21",
   "type": "authorize",
   "data": {
-    "meters": [0, 2],
+    "meter_numbers": [0, 2],
     "user": "mikey",
     "duration_ms": 30000,
     "auth_device": "core.rfid",
@@ -95,7 +95,7 @@ reader              device                                server
 
 | Field | Type | Req | Description |
 |---|---|---|---|
-| `meters` | array of integer | yes | Meter numbers this grant opens. **The server decides the meter set** — this is how one token opens one tap, several, or all. |
+| `meter_numbers` | array of integer | yes | Meter numbers this grant opens. **The server decides the meter set** — this is how one token opens one tap, several, or all. |
 | `user` | string | no | Username to attribute pours to. Absent → guest. |
 | `duration_ms` | integer | yes | Grant lifetime. The device extends expiry while a pour is actively running on a granted meter, so a slow glass is never cut off. |
 | `auth_device` / `token` | string | no | Echo of the presentment that triggered this grant. The device records them onto resulting `pour` events and uses them to release the grant on the matching detach. |
@@ -105,8 +105,9 @@ Device semantics:
 - One active grant **per meter**. A new `authorize` naming an already-granted
   meter replaces that meter's grant (new user, fresh expiry) — the person at
   the tap is whoever presented most recently.
-- The device opens each granted meter's configured toggle (typically a valve
-  relay) if it has one; meters without a toggle simply gain attribution.
+- The device opens each granted meter's configured relay (typically driving
+  a solenoid valve) if it has one; meters without a relay simply gain
+  attribution.
 - **Safety backstop:** the device clamps `duration_ms` to its own
   `max_grant_duration` (default **5 minutes**). A server asking for more
   gets the clamp, silently; the command is still acknowledged `ok`. A valve
@@ -144,15 +145,15 @@ other meters are untouched.
 {
   "id": "cmd_8f22",
   "type": "deauthorize",
-  "data": { "meters": [0, 2] }
+  "data": { "meter_numbers": [0, 2] }
 }
 ```
 
 | Field | Type | Req | Description |
 |---|---|---|---|
-| `meters` | array of integer | no | Meters to revoke. **Absent means all meters.** |
+| `meter_numbers` | array of integer | no | Meters to revoke. **Absent means all meters.** |
 
-Closes the toggles, ends any in-flight pour on those meters (attributed to
+Closes the relays, ends any in-flight pour on those meters (attributed to
 the user who poured it), clears the grants. This is the server-initiated
 cutoff — an admin button, a policy engine, an emergency stop. Detach and
 expiry do the same thing device-side without a command.
@@ -167,7 +168,7 @@ suggested 5 s):
 | `offline_policy` | Behavior |
 |---|---|
 | `deny` (default) | Tap stays closed. Correct for installs where gating is the point. |
-| `guest` | **No valves open.** The device records a guest grant for attribution only — a meter without a toggle still meters, and the queued `token` event reaches the server later, preserving the audit trail. Opening valves offline may be revisited later; for now an offline server never results in an opened valve. |
+| `guest` | **No valves open.** The device records a guest grant for attribution only — a meter without a relay still meters, and the queued `token` event reaches the server later, preserving the audit trail. Opening valves offline may be revisited later; for now an offline server never results in an opened valve. |
 
 Note what is deliberately absent: a device-side token cache. Caching
 assignments would reintroduce the state this design removes and creates
@@ -192,8 +193,8 @@ received in `local` mode are acknowledged with `result: "unsupported"`.
 Grants are per meter, so a two-tap device can simultaneously have Alice on
 meter 0 and Bob on meter 1:
 
-- Alice presents; server responds `authorize {meters: [0], user: "alice"}`.
-- Bob presents; server responds `authorize {meters: [1], user: "bob"}`.
+- Alice presents; server responds `authorize {meter_numbers: [0], user: "alice"}`.
+- Bob presents; server responds `authorize {meter_numbers: [1], user: "bob"}`.
 - Each meter's pours are attributed to its own grant. Detach/expiry/
   `deauthorize` affect only the named meters.
 
@@ -203,7 +204,7 @@ an install with one reader per tap can name readers accordingly (e.g.
 `core.rfid.0`) and the server maps reader → meter. An install with one
 shared reader can grant all meters, or apply fancier policy (the user's
 reserved tap, the tap with their keg on it). The protocol only carries the
-outcome: `meters: [...]`.
+outcome: `meter_numbers: [...]`.
 
 ## 8. Interaction with pour reporting
 

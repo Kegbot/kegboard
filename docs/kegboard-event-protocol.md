@@ -1,8 +1,7 @@
 # Kegboard Event Protocol
 
 **Version:** 1
-**Status:** DRAFT — not yet implemented
-**Date:** 2026-08-03
+**Date:** 2026-08-04
 
 The protocol a Kegboard controller uses to talk to a server. It replaces both
 the legacy KBSP serial protocol and the legacy pykeg HTTP API; neither
@@ -154,7 +153,7 @@ event is created the moment the pour finishes, so
 
 ```json
 {
-  "meter": 0,
+  "meter_number": 0,
   "pour_id": "5f8e2c34-9d1b-4a7e-b02c-8f13d9a6e415",
   "volume_ml": 355.2,
   "duration_ms": 7100,
@@ -169,7 +168,7 @@ event is created the moment the pour finishes, so
 
 | Field | Type | Req | Description |
 |---|---|---|---|
-| `meter` | integer | yes | Meter number on this device, 0-based. `(device, meter)` identifies a tap server-side. |
+| `meter_number` | integer | yes | Meter number on this device, 0-based. `(device, meter_number)` identifies a tap server-side. |
 | `pour_id` | string | yes | Globally unique, **opaque** pour identifier; see §5.2. |
 | `volume_ml` | number | yes | Poured volume. **Authoritative.** Computed on-device from its own calibration. |
 | `duration_ms` | integer | yes | First tick to last tick. |
@@ -188,7 +187,7 @@ default 1000; `0` disables) from pour start until the final `pour` event.
 
 ```json
 {
-  "meter": 0,
+  "meter_number": 0,
   "pour_id": "5f8e2c34-9d1b-4a7e-b02c-8f13d9a6e415",
   "volume_ml": 120.4,
   "duration_ms": 2400
@@ -197,7 +196,7 @@ default 1000; `0` disables) from pour start until the final `pour` event.
 
 | Field | Type | Req | Description |
 |---|---|---|---|
-| `meter` | integer | yes | Meter number. |
+| `meter_number` | integer | yes | Meter number. |
 | `pour_id` | string | yes | Identifies the pour: all updates of one pour and its final `pour` event carry the same value. **Opaque and globally unique** — the device currently generates a UUIDv4, but clients MUST NOT validate the format; it may change. Usable as-is as a key, with no device/boot qualifiers. |
 | `volume_ml` | number | yes | Volume so far. |
 | `duration_ms` | integer | yes | Elapsed since first tick. |
@@ -257,7 +256,10 @@ authorization latency is the user standing at the tap waiting.
 
 Device health and configuration. Emitted at boot and then at the heartbeat
 interval (default **1 minute**). Also the vehicle for making data loss
-visible and for letting the server discover device settings it cannot set.
+visible, for letting the server discover device settings it cannot set,
+and for self-describing the device's hardware: `meters` and `relays` are
+**exhaustive inventories**, so a server can allocate its records for every
+port automatically — and retire records for ports that stop being reported.
 
 ```json
 {
@@ -272,8 +274,12 @@ visible and for letting the server discover device settings it cannot set.
     "queue_capacity": 16
   },
   "meters": [
-    { "meter": 0, "total_ticks": 918234, "ml_per_tick": 0.185 },
-    { "meter": 1, "total_ticks": 40112, "ml_per_tick": 0.185 }
+    { "meter_number": 0, "total_ticks": 918234, "ml_per_tick": 0.185 },
+    { "meter_number": 1, "total_ticks": 40112, "ml_per_tick": 0.185 }
+  ],
+  "relays": [
+    { "relay_number": 0 },
+    { "relay_number": 1 }
   ]
 }
 ```
@@ -286,7 +292,14 @@ visible and for letting the server discover device settings it cannot set.
 | `wifi_rssi_dbm` | integer | no | Signal strength. |
 | `events_dropped` | integer | yes | Lifetime count of events evicted from the queue before delivery. A non-zero delta between heartbeats means data was lost. |
 | `config` | object | yes | Operative device settings the server should be able to discover without being able to set them: heartbeat interval, pour-update interval, queue capacity. Extensible; servers MUST ignore unknown keys. |
-| `meters` | array | no | Per-meter lifetime tick totals and current calibration (`ml_per_tick` always present). Lets a server detect missed pours by gap analysis. |
+| `meters` | array | no | Every meter the device has, with lifetime tick totals and current calibration (`ml_per_tick` always present). Exhaustive when present: a meter absent from the list does not exist on the device. Also lets a server detect missed pours by gap analysis. |
+| `relays` | array | no | Every relay (valve output) the device has. Exhaustive when present, same rule as `meters`. Entries are objects for extensibility; servers MUST ignore unknown keys. |
+
+A server that auto-provisions from these inventories SHOULD be
+conservative about retirement: dropping a record it created is safe, but
+a port an operator has configured (e.g. bound to a tap) deserves a
+warning rather than silent deletion — a transient misreport must not
+sever operator configuration.
 
 ### 5.6 `command_result`
 
@@ -348,7 +361,7 @@ transport (WebSocket/MQTT) can push the same command objects unchanged.
 
 **Command catalog:** `authorize`, `deny`, and `deauthorize` are specified in
 [Authenticated Pouring](authenticated-pouring.md). Further types
-(`set_config`, `set_output`, `identify`) are reserved for a later revision;
+(`set_config`, `set_relay`, `identify`) are reserved for a later revision;
 until specified, devices answer them with `unsupported`.
 
 ## 8. Pairing
@@ -439,7 +452,7 @@ Content-Type: application/json
       "type": "pour",
       "age_ms": 912000,
       "data": {
-        "meter": 0,
+        "meter_number": 0,
         "pour_id": "9b0e6a11-2f4c-49d3-8f6a-c1d2e3f40517",
         "volume_ml": 473.1,
         "duration_ms": 9800,
@@ -452,7 +465,7 @@ Content-Type: application/json
       "id": 18,
       "type": "pour",
       "age_ms": 402000,
-      "data": { "meter": 1, "pour_id": "0d4f9b82-6e3a-4c15-a7b8-2c9d0e1f6a3b", "volume_ml": 355.0, "duration_ms": 7100 }
+      "data": { "meter_number": 1, "pour_id": "0d4f9b82-6e3a-4c15-a7b8-2c9d0e1f6a3b", "volume_ml": 355.0, "duration_ms": 7100 }
     },
     {
       "id": 19,
@@ -466,9 +479,10 @@ Content-Type: application/json
         "events_dropped": 0,
         "config": { "heartbeat_ms": 60000, "pour_update_ms": 1000, "queue_capacity": 16 },
         "meters": [
-          { "meter": 0, "total_ticks": 920791, "ml_per_tick": 0.185 },
-          { "meter": 1, "total_ticks": 42031, "ml_per_tick": 0.185 }
-        ]
+          { "meter_number": 0, "total_ticks": 920791, "ml_per_tick": 0.185 },
+          { "meter_number": 1, "total_ticks": 42031, "ml_per_tick": 0.185 }
+        ],
+        "relays": [ { "relay_number": 0 }, { "relay_number": 1 } ]
       }
     }
   ]
@@ -660,13 +674,13 @@ Normative, to ship in-repo as `schemas/kegboard-event.schema.json`.
     "pour": {
       "type": "object",
       "required": [
-        "meter",
+        "meter_number",
         "pour_id",
         "volume_ml",
         "duration_ms"
       ],
       "properties": {
-        "meter": {
+        "meter_number": {
           "type": "integer",
           "minimum": 0
         },
@@ -709,13 +723,13 @@ Normative, to ship in-repo as `schemas/kegboard-event.schema.json`.
     "pour_update": {
       "type": "object",
       "required": [
-        "meter",
+        "meter_number",
         "pour_id",
         "volume_ml",
         "duration_ms"
       ],
       "properties": {
-        "meter": {
+        "meter_number": {
           "type": "integer",
           "minimum": 0
         },
@@ -840,12 +854,12 @@ Normative, to ship in-repo as `schemas/kegboard-event.schema.json`.
           "items": {
             "type": "object",
             "required": [
-              "meter",
+              "meter_number",
               "total_ticks",
               "ml_per_tick"
             ],
             "properties": {
-              "meter": {
+              "meter_number": {
                 "type": "integer",
                 "minimum": 0
               },
@@ -856,6 +870,21 @@ Normative, to ship in-repo as `schemas/kegboard-event.schema.json`.
               "ml_per_tick": {
                 "type": "number",
                 "exclusiveMinimum": 0
+              }
+            }
+          }
+        },
+        "relays": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "relay_number"
+            ],
+            "properties": {
+              "relay_number": {
+                "type": "integer",
+                "minimum": 0
               }
             }
           }
