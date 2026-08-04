@@ -77,86 +77,17 @@ reader              device                                server
 
 ## 4. Commands
 
-### 4.1 `authorize`
+The three commands this flow uses are fully specified in the main protocol
+doc (§7.1–7.3); this section describes only their role in the flow.
 
-```json
-{
-  "id": "cmd_8f21",
-  "type": "authorize",
-  "data": {
-    "meter_numbers": [0, 2],
-    "user": "mikey",
-    "duration_ms": 30000,
-    "auth_device": "core.rfid",
-    "token": "0089f2c4"
-  }
-}
-```
-
-| Field | Type | Req | Description |
-|---|---|---|---|
-| `meter_numbers` | array of integer | yes | Meter numbers this grant opens. **The server decides the meter set** — this is how one token opens one tap, several, or all. |
-| `user` | string | no | Username to attribute pours to. Absent → guest. |
-| `duration_ms` | integer | yes | Grant lifetime. The device extends expiry while a pour is actively running on a granted meter, so a slow glass is never cut off. |
-| `auth_device` / `token` | string | no | Echo of the presentment that triggered this grant. The device records them onto resulting `pour` events and uses them to release the grant on the matching detach. |
-
-Device semantics:
-
-- One active grant **per meter**. A new `authorize` naming an already-granted
-  meter replaces that meter's grant (new user, fresh expiry) — the person at
-  the tap is whoever presented most recently.
-- The device opens each granted meter's configured relay (typically driving
-  a solenoid valve) if it has one; meters without a relay simply gain
-  attribution.
-- **Safety backstop:** the device clamps `duration_ms` to its own
-  `max_grant_duration` (default **5 minutes**). A server asking for more
-  gets the clamp, silently; the command is still acknowledged `ok`. A valve
-  is a thing that pours beer on the floor when software misbehaves, so the
-  final bound on "how long can it stay open" belongs to the device.
-- Applying the same command id twice is a no-op beyond refreshing expiry
-  (idempotent, since the server re-sends until acked).
-
-### 4.2 `deny`
-
-```json
-{
-  "id": "cmd_8f23",
-  "type": "deny",
-  "data": {
-    "auth_device": "core.rfid",
-    "token": "0089f2c4",
-    "reason": "Token not assigned to a user"
-  }
-}
-```
-
-| Field | Type | Req | Description |
-|---|---|---|---|
-| `auth_device` / `token` | string | no | Echo of the refused presentment, so a device with several readers signals at the right one. |
-| `reason` | string | no | Human-readable explanation. Devices with a display MAY show it; all devices MAY log it. |
-
-The explicit refusal. The device signals the user (refusal tone, LED) and
-acknowledges with `command_result: ok`. No state changes: existing grants on
-other meters are untouched.
-
-### 4.3 `deauthorize`
-
-```json
-{
-  "id": "cmd_8f22",
-  "type": "deauthorize",
-  "data": { "meter_numbers": [0, 2] }
-}
-```
-
-| Field | Type | Req | Description |
-|---|---|---|---|
-| `meter_numbers` | array of integer | no | Meters to revoke. **Absent means all meters.** |
-
-Closes the relays, ends any in-flight pour on those meters (attributed to
-the user who poured it), clears the grants. This is the server-initiated
-cutoff — an admin button, a policy engine, an emergency stop. Detach and
-expiry do the same thing device-side without a command.
+- **`authorize`** creates a grant: the device opens the relays for the
+  server-chosen meter set and attributes subsequent pours to the given
+  user, for a server-chosen (device-clamped) duration.
+- **`deny`** is the explicit refusal: the device signals the user, and no
+  state changes.
+- **`deauthorize`** is the server-initiated cutoff — an admin button, a
+  policy engine, an emergency stop. Detach and expiry do the same thing
+  device-side without a command.
 
 ## 5. Offline behavior in `server` mode
 

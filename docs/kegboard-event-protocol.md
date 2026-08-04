@@ -359,10 +359,104 @@ the heartbeat interval (1 min default); token-triggered commands arrive in
 the same round trip as the token event (see companion doc). A future
 transport (WebSocket/MQTT) can push the same command objects unchanged.
 
-**Command catalog:** `authorize`, `deny`, and `deauthorize` are specified in
-[Authenticated Pouring](authenticated-pouring.md). Further types
-(`set_config`, `set_relay`, `identify`) are reserved for a later revision;
-until specified, devices answer them with `unsupported`.
+The complete command catalog follows. How these commands compose with token
+presentment into an authorization flow — including the `server`/`local`/`open`
+modes and offline behavior — is specified in
+[Authenticated Pouring](authenticated-pouring.md).
+
+### 7.1 `authorize`
+
+Grants pour access on one or more meters: the device opens the granted
+meters' relays and attributes subsequent pours to the given user. Typically
+sent in the same response as a decision-requesting `token` event (see
+companion doc), but valid in any response.
+
+```json
+{
+  "id": "cmd_8f21",
+  "type": "authorize",
+  "data": {
+    "meter_numbers": [0, 2],
+    "user": "mikey",
+    "duration_ms": 30000,
+    "auth_device": "core.rfid",
+    "token": "0089f2c4"
+  }
+}
+```
+
+| Field | Type | Req | Description |
+|---|---|---|---|
+| `meter_numbers` | array of integer | yes | Meter numbers this grant opens. **The server decides the meter set** — this is how one token opens one tap, several, or all. |
+| `user` | string | no | Username to attribute pours to. Absent → guest. |
+| `duration_ms` | integer | yes | Grant lifetime. The device extends expiry while a pour is actively running on a granted meter, so a slow glass is never cut off. |
+| `auth_device` / `token` | string | no | Echo of the presentment that triggered this grant. The device records them onto resulting `pour` events and uses them to release the grant on the matching detach. |
+
+Device semantics:
+
+- One active grant **per meter**. A new `authorize` naming an already-granted
+  meter replaces that meter's grant (new user, fresh expiry) — the person at
+  the tap is whoever presented most recently.
+- The device opens each granted meter's configured relay (typically driving
+  a solenoid valve) if it has one; meters without a relay simply gain
+  attribution.
+- **Safety backstop:** the device clamps `duration_ms` to its own
+  `max_grant_duration` (default **5 minutes**). A server asking for more
+  gets the clamp, silently; the command is still acknowledged `ok`. A valve
+  is a thing that pours beer on the floor when software misbehaves, so the
+  final bound on "how long can it stay open" belongs to the device.
+- Applying the same command id twice is a no-op beyond refreshing expiry
+  (idempotent, since the server re-sends until acked).
+- A device in `local` mode (see companion doc) acknowledges `authorize`
+  with `result: "unsupported"`.
+
+### 7.2 `deny`
+
+The explicit refusal of a token presentment. The device signals the user
+(refusal tone, LED) and acknowledges with `command_result: ok`. No state
+changes: existing grants on other meters are untouched.
+
+```json
+{
+  "id": "cmd_8f23",
+  "type": "deny",
+  "data": {
+    "auth_device": "core.rfid",
+    "token": "0089f2c4",
+    "reason": "Token not assigned to a user"
+  }
+}
+```
+
+| Field | Type | Req | Description |
+|---|---|---|---|
+| `auth_device` / `token` | string | no | Echo of the refused presentment, so a device with several readers signals at the right one. |
+| `reason` | string | no | Human-readable explanation. Devices with a display MAY show it; all devices MAY log it. |
+
+### 7.3 `deauthorize`
+
+Revokes grants: closes the relays, ends any in-flight pour on the named
+meters (attributed to the user who poured it), clears the grants. This is
+the server-initiated cutoff — an admin button, a policy engine, an
+emergency stop. Detach and expiry do the same thing device-side without a
+command.
+
+```json
+{
+  "id": "cmd_8f22",
+  "type": "deauthorize",
+  "data": { "meter_numbers": [0, 2] }
+}
+```
+
+| Field | Type | Req | Description |
+|---|---|---|---|
+| `meter_numbers` | array of integer | no | Meters to revoke. **Absent means all meters.** |
+
+### 7.4 Reserved types
+
+`set_config`, `set_relay`, and `identify` are reserved for a later
+revision; until specified, devices answer them with `unsupported`.
 
 ## 8. Pairing
 
@@ -939,7 +1033,21 @@ Covers both the authenticated (200) and pairing (401) responses.
           "id": { "type": "string", "minLength": 1 },
           "type": { "type": "string" },
           "data": { "type": "object" }
-        }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "type": { "const": "authorize" } } },
+            "then": { "properties": { "data": { "$ref": "#/$defs/authorize" } } }
+          },
+          {
+            "if": { "properties": { "type": { "const": "deny" } } },
+            "then": { "properties": { "data": { "$ref": "#/$defs/deny" } } }
+          },
+          {
+            "if": { "properties": { "type": { "const": "deauthorize" } } },
+            "then": { "properties": { "data": { "$ref": "#/$defs/deauthorize" } } }
+          }
+        ]
       }
     },
     "pairing": {
@@ -951,6 +1059,40 @@ Covers both the authenticated (200) and pairing (401) responses.
       },
       "if": { "properties": { "state": { "const": "allowed" } } },
       "then": { "required": ["state", "token"] }
+    }
+  },
+  "$defs": {
+    "authorize": {
+      "type": "object",
+      "required": ["meter_numbers", "duration_ms"],
+      "properties": {
+        "meter_numbers": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "integer", "minimum": 0 }
+        },
+        "user": { "type": "string" },
+        "duration_ms": { "type": "integer", "exclusiveMinimum": 0 },
+        "auth_device": { "type": "string" },
+        "token": { "type": "string" }
+      }
+    },
+    "deny": {
+      "type": "object",
+      "properties": {
+        "auth_device": { "type": "string" },
+        "token": { "type": "string" },
+        "reason": { "type": "string" }
+      }
+    },
+    "deauthorize": {
+      "type": "object",
+      "properties": {
+        "meter_numbers": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 }
+        }
+      }
     }
   }
 }
