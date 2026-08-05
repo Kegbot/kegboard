@@ -8,7 +8,10 @@
 substitutions:
   name: kegboard
   friendly_name: Kegboard
-  relay_watchdog_timeout: 10s
+  # Longer than kegboard_auth's max_grant_duration (5min), so the watchdog
+  # never closes a granted valve mid-grant: the grant clamp bounds
+  # grant-held relays, the watchdog covers manual/HA toggles.
+  relay_watchdog_timeout: 6min
 
 packages:
   board: !include ../boards/esp32-s3-devkitc-1.yaml

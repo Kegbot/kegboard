@@ -31,7 +31,8 @@ the [`arduino` branch](https://github.com/Kegbot/kegboard/tree/arduino).
   locally — drive valve relays and pour attribution. See
   [Authenticated Pouring](authenticated-pouring.md).
 - **Relay control with watchdog.** Each relay switches itself off after a
-  timeout unless refreshed, so a crashed controller never leaves a valve open.
+  timeout, so a crashed controller never leaves a valve open; grant-held
+  relays are bounded by the grant clamp instead.
 - **Buzzer.** The classic Kegboard melodies, transcribed from the AVR
   firmware.
 - **Outage-proof reporting.** Events queue on the device and deliver late

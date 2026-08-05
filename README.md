@@ -160,8 +160,10 @@ the first miss would make it flap several times a second.
 
 `packages/relays.yaml` and `packages/buzzer.yaml` are plain YAML over stock
 components. The relay watchdog is worth keeping from the AVR firmware: a relay
-left on is usually a valve held open, so each one switches itself off after
-`relay_watchdog_timeout` (default `10s`) unless something turns it on again.
+left on is usually a valve held open, so each one switches itself off
+`relay_watchdog_timeout` (default `10s`) after turning on. On grant-driven
+relays, set it longer than `max_grant_duration` (the grant clamp is their
+bound) or the watchdog closes the valve mid-grant.
 
 ## Repository layout
 

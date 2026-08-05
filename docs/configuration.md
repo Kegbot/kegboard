@@ -106,6 +106,6 @@ Plain YAML over stock components; include what you have.
 | Package | Provides |
 |---|---|
 | `packages/base.yaml` | WiFi + fallback AP, OTA, logging, native API, SNTP time, HTTP client. Expects `name` and `friendly_name` substitutions. |
-| `packages/relays.yaml` | Two GPIO relays, each with a watchdog: auto-off after `relay_watchdog_timeout` (default `10s`, `0s` disables — but consider what's downstream first). |
+| `packages/relays.yaml` | Two GPIO relays, each with a watchdog: auto-off after `relay_watchdog_timeout` from the on-edge (default `10s`, `0s` disables). On grant-driven relays set it longer than `max_grant_duration` — the grant clamp is their bound — or the watchdog closes the valve mid-grant. |
 | `packages/buzzer.yaml` | Passive piezo via `rtttl`, with the legacy boot/auth/ping melodies as scripts. |
 | `boards/*.yaml` | Chip selection + pin-map substitutions. See [Hardware & Wiring](hardware.md). |

@@ -71,8 +71,9 @@ and `dallas_temp`. Any number of sensors on one bus; each needs the usual
 ## Relays and valves
 
 `packages/relays.yaml` defines two GPIO relay outputs, each with a watchdog
-that switches it off after `relay_watchdog_timeout` (default 10 s) unless
-refreshed. Use a relay module rated for logic-level (3.3 V) input, or a
+that switches it off `relay_watchdog_timeout` (default 10 s) after it turns
+on — see the package's notes before putting a grant-driven valve on one.
+Use a relay module rated for logic-level (3.3 V) input, or a
 transistor driver. What's downstream is usually a solenoid valve; give it its
 own supply and a flyback diode if the module lacks one.
 
