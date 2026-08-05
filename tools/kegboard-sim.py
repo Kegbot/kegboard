@@ -318,24 +318,43 @@ class Simulator:
                 self.make_event("command_result", {"command": cmd_id, "result": result})
             )
 
+    @staticmethod
+    def _port_number(value) -> bool:
+        """A JSON meter/relay number: an int, not a bool (True == 1)."""
+        return isinstance(value, int) and not isinstance(value, bool)
+
     def _apply_command(self, cmd_id: str, cmd_type: str, data: dict) -> str:
         if cmd_type == "authorize":
             grant_id = data.get("grant_id")
             meters = data.get("meter_numbers")
             if not isinstance(grant_id, str) or not isinstance(meters, list) or not meters:
                 return "error"
-            if any(not isinstance(m, int) for m in meters):
+            if any(not self._port_number(m) for m in meters):
                 return "error"
             # A grant naming a meter or relay the device does not have is
             # acknowledged `error` and not applied, in whole (protocol §7.1).
             inventory = set(self.totals)
             relays = data.get("relay_numbers") or []
-            if not isinstance(relays, list):
+            if not isinstance(relays, list) or any(
+                not self._port_number(r) for r in relays
+            ):
                 return "error"
             if any(m not in inventory for m in meters) or any(
                 r not in inventory for r in relays
             ):
                 return "error"
+            # Malformed limits are an error ack, never a crashed task: a sim
+            # for in-development servers must survive bad payloads.
+            limits = {}
+            for key in ("max_volume_ml", "max_duration_ms", "max_idle_ms"):
+                value = data.get(key)
+                if value is None:
+                    value = 0
+                if isinstance(value, bool) or not isinstance(value, (int, float)):
+                    return "error"
+                if value < 0:
+                    return "error"
+                limits[key] = value
             existing = next(
                 (g for g in self.grants.values() if g["grant_id"] == grant_id), None
             )
@@ -350,7 +369,7 @@ class Simulator:
                 "replaced",
             )
             now = time.monotonic()
-            max_duration_s = (data.get("max_duration_ms") or 0) / 1000
+            max_duration_s = limits["max_duration_ms"] / 1000
             grant = existing if existing is not None else {
                 "grant_id": grant_id,
                 "created": now,
@@ -362,13 +381,13 @@ class Simulator:
                     "auth_device": data.get("auth_device", ""),
                     "token": data.get("token", ""),
                     "relays": relays,
-                    "max_volume_ml": data.get("max_volume_ml") or 0,
+                    "max_volume_ml": limits["max_volume_ml"],
                     "max_duration_s": (
                         min(max_duration_s, MAX_GRANT_S)
                         if max_duration_s
                         else MAX_GRANT_S
                     ),
-                    "max_idle_s": (data.get("max_idle_ms") or 0) / 1000,
+                    "max_idle_s": limits["max_idle_ms"] / 1000,
                 }
             )
             for meter in meters:
@@ -790,13 +809,19 @@ class KegboardSimApp(App):
                 )
                 await self.sim.flush()
 
-            # Retry queued events: unauthenticated pending pairs poll faster.
+            # Deliver queued events. Healthy and paired sends promptly — the
+            # firmware flushes whenever the queue is non-empty and due — so
+            # command acks and grant endings never wait out the heartbeat.
+            # Unauthenticated pending pairs poll at the pairing cadence; an
+            # unhealthy connection backs off at the retry interval.
             if self.sim.queue and not self.sim.offline and not self.sim.denied:
                 if not self.sim.token and now - last_pairing_poll >= PAIRING_POLL_S:
                     last_pairing_poll = now
                     await self.sim.flush()
                 elif not self.sim.healthy and now - last_retry >= RETRY_S:
                     last_retry = now
+                    await self.sim.flush()
+                elif self.sim.token and self.sim.healthy:
                     await self.sim.flush()
 
     def action_pour(self) -> None:
