@@ -16,3 +16,4 @@ docs/_build/
 # Editors / OS
 .DS_Store
 compile_commands.json
+uv.lock
