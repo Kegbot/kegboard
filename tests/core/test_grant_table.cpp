@@ -94,6 +94,30 @@ TEST(update_sheds_meters_with_replaced_ending) {
   CHECK(t.grant_for(0) != nullptr);
 }
 
+TEST(update_can_move_to_a_disjoint_meter_set) {
+  GrantTable t;
+  t.authorize(spec("g_1", {0, 1}, {4}), 1000);
+  t.record_flow(0, 100.0f, 2000);
+
+  // The update sheds every old meter, yet the grant survives — counters
+  // and age intact — now covering the new set.
+  const auto ends = t.authorize(spec("g_1", {2, 3}, {4}), 3000);
+  CHECK_EQ(ends.size(), 1u);
+  CHECK(ends[0].reason == GrantEndReason::REPLACED);
+  CHECK_EQ(ends[0].meters.size(), 2u);
+  // A partial ending: the grant lives on, so its relays are not released.
+  CHECK(ends[0].relays.empty());
+  CHECK(t.covers_relay(4));
+
+  CHECK_EQ(t.active_count(), 1u);
+  CHECK(t.grant_for(0) == nullptr);
+  CHECK(t.grant_for(1) == nullptr);
+  CHECK_EQ(t.grant_for(2)->spec.grant_id, std::string("g_1"));
+  CHECK_EQ(t.grant_for(3)->spec.grant_id, std::string("g_1"));
+  CHECK_EQ(static_cast<int>(t.grant_by_id("g_1")->poured_ml), 100);
+  CHECK_EQ(t.grant_by_id("g_1")->created_ms, 1000u);
+}
+
 TEST(deauthorize_by_id_ignores_unknown) {
   GrantTable t;
   t.authorize(spec("g_1", {0}), 1000);
@@ -282,6 +306,7 @@ TEST_MAIN("grant_table", {
   RUN(full_takeover_removes_grant_and_reports_relays);
   RUN(update_in_place_keeps_counters);
   RUN(update_sheds_meters_with_replaced_ending);
+  RUN(update_can_move_to_a_disjoint_meter_set);
   RUN(deauthorize_by_id_ignores_unknown);
   RUN(deauthorize_all_clears_everything);
   RUN(detach_ends_only_that_tokens_grants);
