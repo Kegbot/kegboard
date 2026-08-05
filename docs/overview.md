@@ -27,8 +27,8 @@ the [`arduino` branch](https://github.com/Kegbot/kegboard/tree/arduino).
   number of them, via ESPHome's stock `dallas_temp`.
 - **Authentication.** 125 kHz RFID readers and iButtons out of the box; any
   reader ESPHome supports can feed the auth component.
-- **Authenticated pouring.** Per-meter grants — decided by the server or
-  locally — drive valve relays and pour attribution. See
+- **Authenticated pouring.** Server-decided grants drive valve relays and
+  pour attribution. See
   [Authenticated Pouring](authenticated-pouring.md).
 - **Relay control with watchdog.** Each relay switches itself off after a
   timeout, so a crashed controller never leaves a valve open; grant-held

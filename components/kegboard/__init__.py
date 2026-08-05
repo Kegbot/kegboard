@@ -21,8 +21,8 @@ def validate_serial_number(value):
     value = cv.string_strict(value)
     if not value:
         raise cv.Invalid("Serial number must not be empty")
-    # The serial number becomes part of a meter name, which in turn becomes a
-    # URL path segment on Kegbot Server. Keeping it to safe characters avoids
+    # The serial number is the protocol's device identity and tends to end
+    # up in server-side names and URLs. Keeping it to safe characters avoids
     # surprising encoding behaviour later.
     if any(c.isspace() for c in value):
         raise cv.Invalid("Serial number must not contain whitespace")

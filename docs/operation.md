@@ -58,7 +58,7 @@ presentments, heartbeats, command results — and POSTs them as JSON to
 
 `kegboard_auth` holds no token database and no meter↔relay map — only the
 currently active grants, one per meter, each naming its own meters and
-relays from the server. In `server` mode a token presentment is flushed to the server
+relays from the server. A token presentment is flushed to the server
 immediately and the decision (`authorize`/`deny`) returns in the same HTTP
 round trip; grants end at their server-set limits — volume poured, total
 time, idle time — with total time always clamped to `max_grant_duration`,

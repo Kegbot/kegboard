@@ -63,8 +63,8 @@ class KegboardMeter : public Component {
   }
 
   /// Attribution for pours on this meter, set by kegboard_auth while a grant
-  /// is active. Empty grant_id means a locally decided grant (the pour's
-  /// grant_id field is omitted); all empty means ungated/guest.
+  /// is active; cleared (all empty) when none, making the pour a guest
+  /// pour.
   void set_active_auth(const std::string &grant_id, const std::string &auth_device, const std::string &token) {
     this->active_grant_id_ = grant_id;
     this->active_auth_device_ = auth_device;

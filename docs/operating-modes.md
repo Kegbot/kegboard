@@ -33,8 +33,8 @@ speaks the [Kegboard Event Protocol](kegboard-event-protocol.md):
 - Events queue during outages and deliver late with correct timestamps.
 - The board pairs itself from the server dashboard — no API key to configure.
 - Server commands (authorize, deny, valve control) ride back in HTTP
-  responses; with `kegboard_auth` in `server` mode, the server decides every
-  token presentment.
+  responses; with `kegboard_auth`, the server decides every token
+  presentment.
 
 The server does not have to be Kegbot Server: the protocol is a single
 HTTP endpoint with published schemas, and the minimum viable receiver is one

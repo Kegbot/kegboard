@@ -72,8 +72,8 @@ class KegboardReporter : public Component {
   /// Register the handler for server commands (single consumer: auth).
   void set_command_handler(CommandHandler &&handler) { this->command_handler_ = std::move(handler); }
 
-  /// Emit a token event asking the server to decide (no `status` field) and
-  /// flush immediately; any commands in the response are dispatched before
+  /// Emit a token event — always a question for the server — and flush
+  /// immediately; any commands in the response are dispatched before
   /// this returns. @return false if delivery failed (caller applies its
   /// offline policy).
   bool send_token_ask(const std::string &auth_device, const std::string &token);

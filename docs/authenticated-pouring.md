@@ -136,7 +136,7 @@ doc (§7.1–7.3); this section describes only their role in the flow.
   the grant's own limits do the same thing device-side without a
   command.
 
-## 6. Offline behavior in `server` mode
+## 6. Offline behavior
 
 The decision-maker being remote means presentment can race an outage. The
 device applies a configured `offline_policy` when a token event cannot be
