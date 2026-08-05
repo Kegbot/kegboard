@@ -44,6 +44,7 @@ QUEUE_CAPACITY = 16
 POUR_UPDATE_INTERVAL_S = 1.0
 PAIRING_POLL_S = 5.0
 RETRY_S = 5.0
+MAX_GRANT_S = 300.0  # max_grant_duration clamp
 
 TOKEN_PRESETS = [
     ("core.rfid", "0089f2c4", "Alice's fob"),
@@ -84,8 +85,13 @@ class Simulator:
         self.denied = False
         self.offline = False
         self.healthy = True
-        self.grants: dict[int, dict] = {}  # meter -> {user, auth_device, token}
-        self.seen_command_ids: set[str] = set()
+        # meter -> shared grant dict: {grant_id, auth_device, token, relays,
+        # max_volume_ml, max_duration_s, max_idle_s, created, last_flow,
+        # poured_ml}
+        self.grants: dict[int, dict] = {}
+        # meter -> in-flight pour: {pour_id, grant, poured, duration_ms, series}
+        self.pours: dict[int, dict] = {}
+        self.seen_command_ids: dict[str, str] = {}  # id -> result, for re-acks
         self.last_body: str | None = None
         self.presented_presence: tuple[str, str] | None = None
 
@@ -289,97 +295,255 @@ class Simulator:
             return
         for cmd in commands:
             cmd_id, cmd_type = cmd.get("id"), cmd.get("type")
-            if not cmd_id or cmd_id in self.seen_command_ids:
+            if not cmd_id:
                 continue
-            self.seen_command_ids.add(cmd_id)
-            data = cmd.get("data", {})
-            result = self._apply_command(cmd_type, data)
+            if cmd_id in self.seen_command_ids:
+                # Not re-applied, but re-acknowledged: the earlier ack may
+                # have been evicted before delivery (protocol §7).
+                result = self.seen_command_ids[cmd_id]
+                self.log(f"[cyan]← command {cmd_id} re-delivered; re-ack {result}[/]")
+                self.enqueue(
+                    self.make_event(
+                        "command_result", {"command": cmd_id, "result": result}
+                    )
+                )
+                continue
+            data = cmd.get("data")
+            if not isinstance(data, dict):
+                data = {}
+            result = self._apply_command(cmd_id, cmd_type, data)
+            self.seen_command_ids[cmd_id] = result
             self.log(f"[cyan]← command {cmd_type} ({cmd_id}) → {result}[/]")
             self.enqueue(
                 self.make_event("command_result", {"command": cmd_id, "result": result})
             )
 
-    def _apply_command(self, cmd_type: str, data: dict) -> str:
+    def _apply_command(self, cmd_id: str, cmd_type: str, data: dict) -> str:
         if cmd_type == "authorize":
+            grant_id = data.get("grant_id")
             meters = data.get("meter_numbers")
-            if not isinstance(meters, list) or "duration_ms" not in data:
+            if not isinstance(grant_id, str) or not isinstance(meters, list) or not meters:
                 return "error"
-            for meter in meters:
-                self.grants[meter] = {
-                    "user": data.get("user", ""),
+            if any(not isinstance(m, int) for m in meters):
+                return "error"
+            # A grant naming a meter or relay the device does not have is
+            # acknowledged `error` and not applied, in whole (protocol §7.1).
+            inventory = set(self.totals)
+            relays = data.get("relay_numbers") or []
+            if not isinstance(relays, list):
+                return "error"
+            if any(m not in inventory for m in meters) or any(
+                r not in inventory for r in relays
+            ):
+                return "error"
+            existing = next(
+                (g for g in self.grants.values() if g["grant_id"] == grant_id), None
+            )
+            # Meters taken from other grants, or shed by an update, are replaced.
+            self._end_grants(
+                [
+                    m
+                    for m, g in self.grants.items()
+                    if (g is not existing and m in meters)
+                    or (g is existing and m not in meters)
+                ],
+                "replaced",
+            )
+            now = time.monotonic()
+            max_duration_s = (data.get("max_duration_ms") or 0) / 1000
+            grant = existing if existing is not None else {
+                "grant_id": grant_id,
+                "created": now,
+                "last_flow": now,
+                "poured_ml": 0.0,
+            }
+            grant.update(
+                {
                     "auth_device": data.get("auth_device", ""),
                     "token": data.get("token", ""),
+                    "relays": relays,
+                    "max_volume_ml": data.get("max_volume_ml") or 0,
+                    "max_duration_s": (
+                        min(max_duration_s, MAX_GRANT_S)
+                        if max_duration_s
+                        else MAX_GRANT_S
+                    ),
+                    "max_idle_s": (data.get("max_idle_ms") or 0) / 1000,
                 }
-            user = data.get("user") or "guest"
-            self.log(f"[green]authorized {user} on meters {meters}[/]")
-            asyncio.create_task(self._expire_grants(meters, data["duration_ms"] / 1000))
+            )
+            for meter in meters:
+                self.grants[meter] = grant
+            self.log(
+                f"[green]{'updated' if existing else 'granted'} {grant_id}: "
+                f"meters {meters}, relays {grant['relays']}[/]"
+            )
+            if existing is None:
+                asyncio.create_task(self._watch_grant(grant))
             return "ok"
         if cmd_type == "deny":
             self.log(f"[yellow]denied: {data.get('reason', '(no reason)')}[/]")
             return "ok"
         if cmd_type == "deauthorize":
-            meters = data.get("meter_numbers", list(self.grants))
-            for meter in meters:
-                self.grants.pop(meter, None)
-            self.log(f"[yellow]deauthorized meters {meters}[/]")
+            ids = data.get("grant_ids")
+            if ids is not None and not isinstance(ids, list):
+                return "error"
+            self._end_grants(
+                [
+                    m
+                    for m, g in self.grants.items()
+                    if ids is None or g["grant_id"] in ids
+                ],
+                "command",
+            )
             return "ok"
         return "unsupported"
 
-    async def _expire_grants(self, meters: list[int], after_s: float) -> None:
-        await asyncio.sleep(after_s)
-        expired = [m for m in meters if self.grants.pop(m, None) is not None]
-        if expired:
-            self.log(f"grant expired on meters {expired}")
+    def _end_grants(self, meters: list[int], reason: str) -> None:
+        ended: dict[int, tuple[dict, list[int]]] = {}
+        for meter in meters:
+            grant = self.grants.pop(meter, None)
+            if grant is None:
+                continue
+            ended.setdefault(id(grant), (grant, []))[1].append(meter)
+        for grant, released in ended.values():
+            for meter in sorted(released):
+                # A grant ending mid-pour ends the pour first, so the final
+                # pour event precedes the grant_end (protocol §5.7).
+                self._finish_pour(meter)
+            data = {
+                "meter_numbers": sorted(released),
+                "reason": reason,
+                "volume_ml": round(grant["poured_ml"], 3),
+                "duration_ms": int((time.monotonic() - grant["created"]) * 1000),
+            }
+            if grant["auth_device"]:
+                data["auth_device"] = grant["auth_device"]
+            if grant["token"]:
+                data["auth_token"] = grant["token"]
+            if grant["grant_id"]:
+                data["grant_id"] = grant["grant_id"]
+            self.enqueue(self.make_event("grant_end", data))
+            self.log(
+                f"[yellow]grant {grant['grant_id']} ended on meters "
+                f"{sorted(released)}: {reason}[/]"
+            )
+        if ended:
             self.on_state_change()
+            # Deliver promptly when the connection is healthy, rather than
+            # waiting out the heartbeat.
+            asyncio.create_task(self.flush())
+
+    async def _watch_grant(self, grant: dict) -> None:
+        while True:
+            await asyncio.sleep(0.5)
+            meters = [m for m, g in self.grants.items() if g is grant]
+            if not meters:
+                return
+            now = time.monotonic()
+            if now - grant["created"] >= grant["max_duration_s"]:
+                self._end_grants(meters, "max_duration")
+                return
+            if grant["max_idle_s"] and now - grant["last_flow"] >= grant["max_idle_s"]:
+                self._end_grants(meters, "max_idle")
+                return
 
     # -- simulated activity -------------------------------------------------
+
+    def _finish_pour(self, meter: int) -> None:
+        """End the in-flight pour on `meter` (if any) and emit its pour event."""
+        state = self.pours.pop(meter, None)
+        if state is None:
+            return
+        poured = state["poured"]
+        if poured <= 0:
+            # Mirrors the firmware's min_pour_ticks: a pour ended before any
+            # volume registered is a drip, not a record.
+            self.log(f"[yellow]pour on meter {meter} discarded (no volume)[/]")
+            return
+        ticks = int(poured / self.ml_per_tick)
+        self.totals[meter] = self.totals.get(meter, 0) + ticks
+        data = {
+            "meter_number": meter,
+            "pour_id": state["pour_id"],
+            "volume_ml": round(poured, 3),
+            "duration_ms": state["duration_ms"],
+            "ticks": ticks,
+            "ml_per_tick": self.ml_per_tick,
+            "tick_series": " ".join(f"{t}:{n}" for t, n in state["series"]),
+        }
+        grant = state["grant"]
+        if grant is not None:
+            if grant["auth_device"]:
+                data["auth_device"] = grant["auth_device"]
+            if grant["token"]:
+                data["auth_token"] = grant["token"]
+            data["grant_id"] = grant["grant_id"]
+        self.enqueue(self.make_event("pour", data))
+        self.log(f"[bold]pour complete on meter {meter}: {ticks} ticks[/]")
 
     async def pour(
         self, meter: int = 0, volume_ml: float = 355.0, duration_s: float = 4.0
     ):
-        pour_id = str(uuid.uuid4())
-        grant = self.grants.get(meter, {})
-        who = grant.get("user") or "guest"
+        if meter in self.pours:
+            self.log(f"[yellow]meter {meter} is already pouring[/]")
+            return
+        who = self.grants[meter]["grant_id"] if meter in self.grants else "guest"
         self.log(f"[bold]pouring {volume_ml:.0f} mL on meter {meter} as {who}...[/]")
 
+        state = {
+            "pour_id": str(uuid.uuid4()),
+            "grant": self.grants.get(meter),
+            "poured": 0.0,
+            "duration_ms": 0,
+            "series": [],
+        }
+        self.pours[meter] = state
+
         steps = max(1, int(duration_s / POUR_UPDATE_INTERVAL_S))
-        poured = 0.0
-        series: list[tuple[int, int]] = []
+        prev = 0.0
         for step in range(steps):
             await asyncio.sleep(POUR_UPDATE_INTERVAL_S)
+            if self.pours.get(meter) is not state:
+                return  # a grant ending finished this pour already
             poured = volume_ml * (step + 1) / steps * random.uniform(0.97, 1.03)
             poured = min(poured, volume_ml)
-            series.append((step * 1000, int(poured / self.ml_per_tick / steps)))
+            state["poured"] = poured
+            state["duration_ms"] = int((step + 1) * POUR_UPDATE_INTERVAL_S * 1000)
+            state["series"].append((step * 1000, int(poured / self.ml_per_tick / steps)))
+            # POLICY — a grant arriving mid-pour adopts it, and attribution
+            # is read at pour end (authenticated-pouring §9, case 2). Limit
+            # accounting stays delta-based, so pre-grant volume never counts
+            # toward max_volume_ml.
+            grant = self.grants.get(meter)
+            if grant is not None:
+                state["grant"] = grant
+                grant["last_flow"] = time.monotonic()
+                grant["poured_ml"] += poured - prev
+            prev = poured
+            if (
+                grant is not None
+                and grant["max_volume_ml"]
+                and grant["poured_ml"] >= grant["max_volume_ml"]
+            ):
+                # The valve closes the moment the limit trips: the pour ends
+                # now (inside _end_grants, before the grant_end is queued).
+                self._end_grants(
+                    [m for m, g in self.grants.items() if g is grant], "max_volume"
+                )
+                return
             if self.healthy and not self.offline and not self.denied:
                 update = self.make_event(
                     "pour_update",
                     {
                         "meter_number": meter,
-                        "pour_id": pour_id,
+                        "pour_id": state["pour_id"],
                         "volume_ml": round(poured, 3),
-                        "duration_ms": int((step + 1) * POUR_UPDATE_INTERVAL_S * 1000),
+                        "duration_ms": state["duration_ms"],
                     },
                 )
                 await self.flush(ephemeral=[update])
 
-        ticks = int(volume_ml / self.ml_per_tick)
-        self.totals[meter] = self.totals.get(meter, 0) + ticks
-        data = {
-            "meter_number": meter,
-            "pour_id": pour_id,
-            "volume_ml": round(volume_ml, 3),
-            "duration_ms": int(duration_s * 1000),
-            "ticks": ticks,
-            "ml_per_tick": self.ml_per_tick,
-            "tick_series": " ".join(f"{t}:{n}" for t, n in series),
-        }
-        if grant.get("user"):
-            data["user"] = grant["user"]
-        if grant.get("auth_device"):
-            data["auth_device"] = grant["auth_device"]
-            data["auth_token"] = grant["token"]
-        self.enqueue(self.make_event("pour", data))
-        self.log(f"[bold]pour complete: {ticks} ticks[/]")
+        self._finish_pour(meter)
         await self.flush()
 
     def make_status(self, boot: bool) -> dict:
@@ -408,7 +572,7 @@ class Simulator:
         self.log(f"[bold]presenting {label} ({auth_device}/{token})[/]")
         if auth_device == "onewire":
             self.presented_presence = (auth_device, token)
-        # No `status` field: the server decides (authenticated-pouring §3).
+        # No `status` field: the server decides (authenticated-pouring §4).
         self.enqueue(
             self.make_event(
                 "token",
@@ -425,8 +589,15 @@ class Simulator:
             return
         auth_device, token = self.presented_presence
         self.presented_presence = None
-        for meter in [m for m, g in self.grants.items() if g.get("token") == token]:
-            self.grants.pop(meter)
+        self._end_grants(
+            [
+                m
+                for m, g in self.grants.items()
+                if g.get("token") == token
+                and (not g.get("auth_device") or g.get("auth_device") == auth_device)
+            ],
+            "detach",
+        )
         self.log(f"[bold]detaching {auth_device}/{token}[/]")
         self.enqueue(
             self.make_event(
@@ -448,6 +619,10 @@ class Simulator:
         self.started_mono = time.monotonic()
         self.queue.clear()
         self.grants.clear()
+        self.pours.clear()
+        # RAM state: a real device forgets applied command ids at reboot and
+        # relies on re-sent commands being idempotent.
+        self.seen_command_ids.clear()
         self.dropped = 0
         self.totals = {0: 0, 1: 0}
         self.denied = False
@@ -553,7 +728,7 @@ class KegboardSimApp(App):
         s = self.sim
         grants = (
             ", ".join(
-                f"m{m}:{g.get('user') or 'guest'}" for m, g in sorted(s.grants.items())
+                f"m{m}:{g.get('grant_id') or 'guest'}" for m, g in sorted(s.grants.items())
             )
             or "none"
         )
