@@ -14,7 +14,7 @@ namespace kbcore {
 /// A bounded record of when ticks arrived during a pour.
 ///
 /// Reported as the pour event's `tick_series`, a space-separated sequence
-/// of `<offset_ms>:<ticks>` pairs (protocol §5.1). It is diagnostic
+/// of `<offset_ms>:<ticks>` pairs. It is diagnostic
 /// data only, so this class prioritizes bounded memory over fidelity: ticks
 /// are bucketed at a configurable resolution, and when the buffer fills, the
 /// series is coarsened in place (adjacent buckets merged, resolution doubled)

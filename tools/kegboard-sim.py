@@ -299,7 +299,7 @@ class Simulator:
                 continue
             if cmd_id in self.seen_command_ids:
                 # Not re-applied, but re-acknowledged: the earlier ack may
-                # have been evicted before delivery (protocol §7).
+                # have been evicted before delivery.
                 result = self.seen_command_ids[cmd_id]
                 self.log(f"[cyan]← command {cmd_id} re-delivered; re-ack {result}[/]")
                 self.enqueue(
@@ -332,7 +332,7 @@ class Simulator:
             if any(not self._port_number(m) for m in meters):
                 return "error"
             # A grant naming a meter or relay the device does not have is
-            # acknowledged `error` and not applied, in whole (protocol §7.1).
+            # acknowledged `error` and not applied, in whole.
             inventory = set(self.totals)
             relays = data.get("relay_numbers") or []
             if not isinstance(relays, list) or any(
@@ -427,7 +427,7 @@ class Simulator:
         for grant, released in ended.values():
             for meter in sorted(released):
                 # A grant ending mid-pour ends the pour first, so the final
-                # pour event precedes the grant_end (protocol §5.7).
+                # pour event precedes the grant_end.
                 self._finish_pour(meter)
             data = {
                 "meter_numbers": sorted(released),
@@ -527,7 +527,7 @@ class Simulator:
         for step in range(steps):
             await asyncio.sleep(POUR_UPDATE_INTERVAL_S)
             if self.pours.get(meter) is not state:
-                # A grant boundary ended the pour mid-glass (§8 cases 3/5):
+                # A grant boundary ended the pour mid-glass:
                 # the beer keeps flowing, so a fresh pour_id opens under
                 # whatever covers the meter now — or as a guest pour.
                 state = begin_segment(step)
@@ -546,7 +546,7 @@ class Simulator:
             tick_delta = int(total / self.ml_per_tick) - int(prev_total / self.ml_per_tick)
             state["series"].append(((step - state["_start_step"]) * 1000, tick_delta))
             # POLICY — a grant arriving mid-pour adopts it, and attribution
-            # is read at pour end (authenticated-pouring §8, case 2). Limit
+            # is read at pour end (see authenticated-pouring). Limit
             # accounting stays delta-based, so pre-grant volume never counts
             # toward max_volume_ml.
             grant = self.grants.get(meter)
@@ -607,8 +607,7 @@ class Simulator:
         self.log(f"[bold]presenting {label} ({auth_device}/{token})[/]")
         if auth_device == "onewire":
             self.presented_presence = (auth_device, token)
-        # An attached token event is always a question for the server
-        # (authenticated-pouring §4).
+        # An attached token event is always a question for the server.
         self.enqueue(
             self.make_event(
                 "token",

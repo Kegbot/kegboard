@@ -48,4 +48,6 @@ http_request:
   # Self-hosted Kegbot Servers often use a private CA or a self-signed
   # certificate. Set this to false there, or supply ca_certificate_path.
   verify_ssl: true
-  timeout: 10s
+  # Short, because this bounds how long someone stands at the tap waiting
+  # for an offline decision (see authenticated-pouring's offline behavior).
+  timeout: 5s

@@ -391,7 +391,7 @@ temperatures this is noise.
 
 ## 7. Response and commands
 
-The response to every authenticated 2xx exchange:
+The response to every 2xx exchange, authenticated or not:
 
 ```json
 {

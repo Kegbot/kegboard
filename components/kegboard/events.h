@@ -16,7 +16,7 @@
 
 namespace kbcore {
 
-/// Maximum events per batch, per protocol §3.
+/// Maximum events per batch, per the protocol's request envelope.
 constexpr size_t MAX_BATCH_EVENTS = 16;
 
 /// A protocol event, payload pre-serialized.
@@ -50,7 +50,7 @@ struct PourData {
   std::string auth_device;
   std::string auth_token;
   /// Server-assigned id of the covering grant; empty for ungated (guest)
-  /// pours (protocol §5.1).
+  /// pours.
   std::string grant_id;
   /// UINT32_MAX omits `ticks`.
   uint32_t ticks{UINT32_MAX};
@@ -86,7 +86,7 @@ struct StatusData {
   uint32_t pour_update_ms{0};
   uint32_t queue_capacity{0};
   std::vector<StatusMeter> meters;
-  /// Relay numbers; exhaustive inventory, like meters (protocol §5.5).
+  /// Relay numbers; exhaustive inventory, like meters.
   std::vector<uint8_t> relays;
 };
 
@@ -94,7 +94,7 @@ std::string status_data_json(const StatusData &d);
 
 std::string command_result_data_json(const std::string &command, const char *result, const std::string &message);
 
-/// `grant_end` (protocol §5.7), straight from a GrantTable ending.
+/// `grant_end`, straight from a GrantTable ending.
 std::string grant_end_data_json(const GrantEnd &end);
 
 // --- Batch serialization ---------------------------------------------------
