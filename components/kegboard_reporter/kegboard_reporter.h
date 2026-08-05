@@ -86,7 +86,7 @@ class KegboardReporter : public Component {
   /// send_token_ask).
   void queue_token_event(const std::string &auth_device, const std::string &token, bool attached);
 
-  /// Emit a grant_end event (protocol §5.7). Queued normally: it does not
+  /// Emit a grant_end event. Queued normally: it does not
   /// reset backoff, and when delivery is healthy it goes out on the next
   /// send.
   void queue_grant_end(const kbcore::GrantEnd &end);

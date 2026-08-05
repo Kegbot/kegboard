@@ -95,9 +95,11 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_THERMO_SENSORS, default=[]): cv.ensure_list(
             THERMO_SENSOR_SCHEMA
         ),
-        cv.Optional(
-            CONF_HEARTBEAT_INTERVAL, default="60s"
-        ): cv.positive_time_period_milliseconds,
+        # The status schema requires heartbeat_ms >= 1000.
+        cv.Optional(CONF_HEARTBEAT_INTERVAL, default="60s"): cv.All(
+            cv.positive_time_period_milliseconds,
+            cv.Range(min=cv.TimePeriod(seconds=1)),
+        ),
         # 0s disables pour_update events.
         cv.Optional(
             CONF_POUR_UPDATE_INTERVAL, default="1s"

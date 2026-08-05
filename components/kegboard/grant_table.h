@@ -3,10 +3,10 @@
 // Authorization grants.
 //
 // Implements the device half of docs/authenticated-pouring.md: server-issued
-// grants that each carry their own meter and relay sets and limits
-// (protocol §7.1), one active grant per meter, in-place updates by grant id,
-// and the device-side duration clamp. Every ending is reported with a
-// reason, for the grant_end event (protocol §5.7).
+// grants that each carry their own meter and relay sets and limits, one
+// active grant per meter, in-place updates by grant id, and the device-side
+// duration clamp. Every ending is reported with a reason, for the grant_end
+// event.
 //
 // Part of the framework-agnostic kegboard core: no ESPHome, Arduino, or
 // ESP-IDF headers. See CORE.md.
@@ -17,13 +17,13 @@
 
 namespace kbcore {
 
-/// Why a grant (or part of one) ended; protocol §5.7.
+/// Why a grant (or part of one) ended.
 enum class GrantEndReason : uint8_t { MAX_VOLUME, MAX_DURATION, MAX_IDLE, DETACH, COMMAND, REPLACED };
 
 /// The protocol string for a reason, e.g. "max_volume".
 const char *grant_end_reason_str(GrantEndReason reason);
 
-/// What an authorize command carries (protocol §7.1).
+/// What an authorize command carries.
 struct GrantSpec {
   std::string grant_id;
   std::vector<uint8_t> meters;
@@ -50,7 +50,7 @@ struct Grant {
 /// One grant ending, ready to become a grant_end event. For a partial ending
 /// (reason REPLACED with the grant surviving) `relays` is empty — the grant
 /// keeps its relays. `volume_ml`/`duration_ms` are snapshots of the whole
-/// grant, per protocol §5.7.
+/// grant, never per-meter deltas.
 struct GrantEnd {
   std::string grant_id;
   std::string auth_device;
@@ -70,7 +70,7 @@ struct GrantEnd {
 /// grant_end events without re-deriving state.
 class GrantTable {
  public:
-  /// Device-side safety backstop on total grant lifetime (protocol §7.1).
+  /// Device-side safety backstop on total grant lifetime.
   /// Applies whatever max_duration_ms says, including "unlimited".
   void set_max_duration_ms(uint32_t v) { max_duration_ms_ = v; }
   uint32_t max_duration_ms() const { return max_duration_ms_; }
@@ -109,7 +109,7 @@ class GrantTable {
   /// mutation.
   const Grant *grant_by_id(const std::string &grant_id) const;
 
-  /// True while any active grant names this relay (protocol §7.1: a relay is
+  /// True while any active grant names this relay (a relay is
   /// energized while any grant names it).
   bool covers_relay(uint8_t relay) const;
 

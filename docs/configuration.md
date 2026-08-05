@@ -95,7 +95,7 @@ but has no arrive/leave events. Triggers `on_token_attached` and
 
 | Option | Default | Notes |
 |---|---|---|
-| `one_wire_id` | required | The bus to poll. Use a bus separate from the thermo sensors. |
+| `one_wire_id` | auto | The bus to poll; bound automatically when exactly one `one_wire` bus exists, required with several. Use a bus separate from the thermo sensors. |
 | `update_interval` | `1s` | Poll cadence. |
 | `max_missed_searches` | `4` | Consecutive misses before a detach is reported. A held iButton makes intermittent contact; reporting on the first miss would flap several times a second. |
 

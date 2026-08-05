@@ -86,7 +86,7 @@ std::vector<GrantEnd> GrantTable::authorize(const GrantSpec &spec, uint32_t now_
     if (g.spec.grant_id == spec.grant_id) {
       // Update in place: sets and limits replace; counters carry over, so a
       // top-up cannot reset volume already poured, and the clamp still
-      // bounds total lifetime from the original creation (protocol §7.1).
+      // bounds total lifetime from the original creation.
       g.spec = spec;
       g.effective_max_duration_ms = this->effective_max_duration_(spec.max_duration_ms);
       return ends;
