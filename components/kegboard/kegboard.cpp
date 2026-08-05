@@ -15,9 +15,9 @@ void KegboardHub::setup() {
   if (!this->serial_number_.empty())
     return;
 
-  // Derive a stable identity from the last three MAC bytes. Kegbot Server
-  // keys meters by name, so this needs to survive reflashing and stay unique
-  // across boards on the same network; the MAC gives both for free.
+  // Derive a stable identity from the last three MAC bytes. The server
+  // keys taps by `(device, meter_number)`, so this needs to survive
+  // reflashing and stay unique across boards; the MAC gives both for free.
   uint8_t mac[6];
   get_mac_address_raw(mac);
 

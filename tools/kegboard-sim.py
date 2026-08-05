@@ -571,7 +571,8 @@ class Simulator:
         self.log(f"[bold]presenting {label} ({auth_device}/{token})[/]")
         if auth_device == "onewire":
             self.presented_presence = (auth_device, token)
-        # No `status` field: the server decides (authenticated-pouring §4).
+        # An attached token event is always a question for the server
+        # (authenticated-pouring §4).
         self.enqueue(
             self.make_event(
                 "token",

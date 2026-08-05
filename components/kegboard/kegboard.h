@@ -12,8 +12,8 @@ extern const char *const KEGBOARD_VERSION;
 /// Shared board identity for a Kegboard.
 ///
 /// Mostly exists so meters and reporters agree on what this board is called.
-/// Kegbot Server keys a meter by name (`<board>.flow0`), so the serial number
-/// is what ties a physical board to its taps on the server.
+/// The protocol identifies a tap by `(device, meter_number)`, so the serial
+/// number is what ties a physical board to its taps on the server.
 class KegboardHub : public Component {
  public:
   void setup() override;
