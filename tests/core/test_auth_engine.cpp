@@ -58,8 +58,7 @@ struct FakeDevice {
       this->relay_state[r] = on;
     };
     d.emit_grant_end = [this](const kbcore::GrantEnd &end) {
-      this->log.push_back("grant_end " + end.grant_id + " " +
-                          std::string(kbcore::grant_end_reason_str(end.reason)));
+      this->log.push_back("grant_end " + end.grant_id + " " + std::string(kbcore::grant_end_reason_str(end.reason)));
       this->ends.push_back(end);
     };
     return d;

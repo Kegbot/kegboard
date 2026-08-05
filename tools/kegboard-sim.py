@@ -327,7 +327,11 @@ class Simulator:
         if cmd_type == "authorize":
             grant_id = data.get("grant_id")
             meters = data.get("meter_numbers")
-            if not isinstance(grant_id, str) or not isinstance(meters, list) or not meters:
+            if (
+                not isinstance(grant_id, str)
+                or not isinstance(meters, list)
+                or not meters
+            ):
                 return "error"
             if any(not self._port_number(m) for m in meters):
                 return "error"
@@ -370,12 +374,16 @@ class Simulator:
             )
             now = time.monotonic()
             max_duration_s = limits["max_duration_ms"] / 1000
-            grant = existing if existing is not None else {
-                "grant_id": grant_id,
-                "created": now,
-                "last_flow": now,
-                "poured_ml": 0.0,
-            }
+            grant = (
+                existing
+                if existing is not None
+                else {
+                    "grant_id": grant_id,
+                    "created": now,
+                    "last_flow": now,
+                    "poured_ml": 0.0,
+                }
+            )
             grant.update(
                 {
                     "auth_device": data.get("auth_device", ""),
@@ -543,7 +551,9 @@ class Simulator:
             state["duration_ms"] = int(
                 (step + 1 - state["_start_step"]) * POUR_UPDATE_INTERVAL_S * 1000
             )
-            tick_delta = int(total / self.ml_per_tick) - int(prev_total / self.ml_per_tick)
+            tick_delta = int(total / self.ml_per_tick) - int(
+                prev_total / self.ml_per_tick
+            )
             state["series"].append(((step - state["_start_step"]) * 1000, tick_delta))
             # POLICY — a grant arriving mid-pour adopts it, and attribution
             # is read at pour end (see authenticated-pouring). Limit
@@ -596,7 +606,11 @@ class Simulator:
                     "queue_capacity": QUEUE_CAPACITY,
                 },
                 "meters": [
-                    {"meter_number": m, "total_ticks": t, "ml_per_tick": self.ml_per_tick}
+                    {
+                        "meter_number": m,
+                        "total_ticks": t,
+                        "ml_per_tick": self.ml_per_tick,
+                    }
                     for m, t in sorted(self.totals.items())
                 ],
                 "relays": [{"relay_number": m} for m in sorted(self.totals)],
@@ -763,7 +777,8 @@ class KegboardSimApp(App):
         s = self.sim
         grants = (
             ", ".join(
-                f"m{m}:{g.get('grant_id') or 'guest'}" for m, g in sorted(s.grants.items())
+                f"m{m}:{g.get('grant_id') or 'guest'}"
+                for m, g in sorted(s.grants.items())
             )
             or "none"
         )

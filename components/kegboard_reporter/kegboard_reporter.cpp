@@ -293,8 +293,8 @@ bool KegboardReporter::send_batch_(std::vector<kbcore::Event> &&ephemeral) {
     const int n = container->read(chunk, sizeof(chunk));
     App.feed_wdt();
     yield();
-    const auto step = http_request::http_read_loop_result(n, last_data_ms, this->http_->get_timeout(),
-                                                          container->is_read_complete());
+    const auto step =
+        http_request::http_read_loop_result(n, last_data_ms, this->http_->get_timeout(), container->is_read_complete());
     if (step == http_request::HttpReadLoopResult::DATA) {
       response.append(reinterpret_cast<const char *>(chunk), static_cast<size_t>(n));
       continue;
