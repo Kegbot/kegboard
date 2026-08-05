@@ -489,26 +489,43 @@ class Simulator:
         who = self.grants[meter]["grant_id"] if meter in self.grants else "guest"
         self.log(f"[bold]pouring {volume_ml:.0f} mL on meter {meter} as {who}...[/]")
 
-        state = {
-            "pour_id": str(uuid.uuid4()),
-            "grant": self.grants.get(meter),
-            "poured": 0.0,
-            "duration_ms": 0,
-            "series": [],
-        }
-        self.pours[meter] = state
+        def begin_segment(step: int) -> dict:
+            state = {
+                "pour_id": str(uuid.uuid4()),
+                "grant": self.grants.get(meter),
+                "poured": 0.0,
+                "duration_ms": 0,
+                "series": [],
+                "_start_step": step,
+            }
+            self.pours[meter] = state
+            return state
 
+        state = begin_segment(0)
         steps = max(1, int(duration_s / POUR_UPDATE_INTERVAL_S))
-        prev = 0.0
+        total = 0.0  # glass volume so far, across segments
+        seg_base = 0.0  # glass volume when the current segment began
         for step in range(steps):
             await asyncio.sleep(POUR_UPDATE_INTERVAL_S)
             if self.pours.get(meter) is not state:
-                return  # a grant ending finished this pour already
-            poured = volume_ml * (step + 1) / steps * random.uniform(0.97, 1.03)
-            poured = min(poured, volume_ml)
-            state["poured"] = poured
-            state["duration_ms"] = int((step + 1) * POUR_UPDATE_INTERVAL_S * 1000)
-            state["series"].append((step * 1000, int(poured / self.ml_per_tick / steps)))
+                # A grant boundary ended the pour mid-glass (§8 cases 3/5):
+                # the beer keeps flowing, so a fresh pour_id opens under
+                # whatever covers the meter now — or as a guest pour.
+                state = begin_segment(step)
+                seg_base = total
+                tag = state["grant"]["grant_id"] if state["grant"] else "guest"
+                self.log(f"[bold]pour on meter {meter} continues as {tag}[/]")
+            prev_total = total
+            total = min(
+                max(total, volume_ml * (step + 1) / steps * random.uniform(0.97, 1.03)),
+                volume_ml,
+            )
+            state["poured"] = total - seg_base
+            state["duration_ms"] = int(
+                (step + 1 - state["_start_step"]) * POUR_UPDATE_INTERVAL_S * 1000
+            )
+            tick_delta = int(total / self.ml_per_tick) - int(prev_total / self.ml_per_tick)
+            state["series"].append(((step - state["_start_step"]) * 1000, tick_delta))
             # POLICY — a grant arriving mid-pour adopts it, and attribution
             # is read at pour end (authenticated-pouring §8, case 2). Limit
             # accounting stays delta-based, so pre-grant volume never counts
@@ -517,8 +534,7 @@ class Simulator:
             if grant is not None:
                 state["grant"] = grant
                 grant["last_flow"] = time.monotonic()
-                grant["poured_ml"] += poured - prev
-            prev = poured
+                grant["poured_ml"] += total - prev_total
             if (
                 grant is not None
                 and grant["max_volume_ml"]
@@ -526,17 +542,18 @@ class Simulator:
             ):
                 # The valve closes the moment the limit trips: the pour ends
                 # now (inside _end_grants, before the grant_end is queued).
+                # If beer is still coming, the next step opens a guest pour.
                 self._end_grants(
                     [m for m, g in self.grants.items() if g is grant], "max_volume"
                 )
-                return
+                continue
             if self.healthy and not self.offline and not self.denied:
                 update = self.make_event(
                     "pour_update",
                     {
                         "meter_number": meter,
                         "pour_id": state["pour_id"],
-                        "volume_ml": round(poured, 3),
+                        "volume_ml": round(state["poured"], 3),
                         "duration_ms": state["duration_ms"],
                     },
                 )
