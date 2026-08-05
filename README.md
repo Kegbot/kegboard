@@ -75,7 +75,7 @@ kegboard:
 kegboard_meter:
   - id: flow0
     pin: GPIO4
-    index: 0
+    meter_number: 0
     total:
       name: Tap 1 Ticks
     pouring:
