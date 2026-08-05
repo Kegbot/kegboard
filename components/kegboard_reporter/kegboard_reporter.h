@@ -6,6 +6,7 @@
 
 #include "esphome/components/http_request/http_request.h"
 #include "esphome/components/json/json_util.h"
+#include "esphome/components/kegboard/delivery.h"
 #include "esphome/components/kegboard/events.h"
 #include "esphome/components/kegboard/kegboard.h"
 #include "esphome/components/kegboard/ring_queue.h"
@@ -48,9 +49,12 @@ class KegboardReporter : public Component {
   /// Full reporting URL, path included, e.g.
   /// "https://kegbot.example.com/api/kegboard-event". Used verbatim.
   void set_reporting_url(const std::string &url) { this->reporting_url_ = url; }
-  void set_heartbeat_interval_ms(uint32_t v) { this->heartbeat_ms_ = v; }
+  void set_heartbeat_interval_ms(uint32_t v) {
+    this->heartbeat_ms_ = v;
+    this->delivery_.set_heartbeat_ms(v);
+  }
   void set_pour_update_interval_ms(uint32_t v) { this->pour_update_ms_ = v; }
-  void set_retry_interval_ms(uint32_t v) { this->retry_interval_ms_ = v; }
+  void set_retry_interval_ms(uint32_t v) { this->delivery_.set_retry_interval_ms(v); }
 
   void add_meter(kegboard_meter::KegboardMeter *meter);
   /// Register a numbered relay (protocol relay_number → the relay to drive).
@@ -116,9 +120,8 @@ class KegboardReporter : public Component {
 
   /// Deliveries are currently succeeding. Deliberately not conditioned on
   /// is_paired(): against a server that never asks for auth, the device runs
-  /// unpaired forever and must still behave fully (protocol §2).
-  bool healthy_() const { return !this->denied_ && this->consecutive_failures_ == 0; }
-  void bump_backoff_();
+  /// unpaired forever and must still behave fully.
+  bool healthy_() const { return !this->delivery_.denied() && this->delivery_.consecutive_failures() == 0; }
   void publish_diagnostics_();
   void load_token_();
   void save_token_(const std::string &token);
@@ -142,25 +145,11 @@ class KegboardReporter : public Component {
 
   uint32_t heartbeat_ms_{60000};
   uint32_t pour_update_ms_{1000};
-  uint32_t retry_interval_ms_{30000};
 
-  uint32_t next_attempt_ms_{0};
   uint32_t next_heartbeat_ms_{0};
-  uint32_t consecutive_failures_{0};
 
-  /// Pairing state. denied_ stops all polling until reboot.
-  bool denied_{false};
-  uint32_t pairing_started_ms_{0};
-
-  /// Recently applied commands and their outcomes; the server re-sends
-  /// until it sees a command_result, so a duplicate is not re-applied but
-  /// is re-acknowledged (the original ack may have been evicted from the
-  /// queue before delivery).
-  struct AppliedCommand {
-    std::string id;
-    const char *result;
-  };
-  std::vector<AppliedCommand> recent_commands_;
+  /// Attempt timing, backoff, pairing cadence, and command dedup/re-acks.
+  kbcore::Delivery delivery_;
 
   ESPPreferenceObject token_pref_;
 

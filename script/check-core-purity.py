@@ -30,6 +30,10 @@ CORE_FILES = [
     "events.cpp",
     "grant_table.h",
     "grant_table.cpp",
+    "delivery.h",
+    "delivery.cpp",
+    "auth_engine.h",
+    "auth_engine.cpp",
 ]
 
 FORBIDDEN = re.compile(

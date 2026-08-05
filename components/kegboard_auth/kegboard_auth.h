@@ -1,11 +1,11 @@
 #pragma once
 
-#include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
 #include "esphome/components/binary_sensor/binary_sensor.h"
-#include "esphome/components/kegboard/grant_table.h"
+#include "esphome/components/kegboard/auth_engine.h"
 #include "esphome/components/kegboard_meter/kegboard_meter.h"
 #include "esphome/components/kegboard_reporter/kegboard_reporter.h"
 #include "esphome/components/switch/switch.h"
@@ -27,13 +27,12 @@ class RevokedTrigger : public Trigger<> {};
 
 /// Applies authorization to taps, per docs/authenticated-pouring.md.
 ///
-/// Holds no token database and no meter↔relay map. Every presentment is
-/// sent to the server, whose authorize/deny commands ride back in the same
-/// round trip; each grant arrives naming the meters it covers, the relays
-/// it opens, and its limits (protocol §7.1). Grants live in a
-/// kbcore::GrantTable; this class validates them against the device
-/// inventory, drives relays and meter attribution, feeds flow into the
-/// limits, and reports every ending as a grant_end event (§5.7).
+/// A thin adapter: token presentments go to the server through the
+/// reporter, and the server's authorize/deny/deauthorize commands drive a
+/// kbcore::AuthEngine, which owns all grant semantics (validation, limits,
+/// relays, attribution, adoption, endings). This class supplies the engine
+/// its device — meters and relays via the reporter — plus JSON parsing,
+/// entities, triggers, and logging.
 class KegboardAuth : public Component {
  public:
   void setup() override;
@@ -43,7 +42,7 @@ class KegboardAuth : public Component {
 
   void set_reporter(kegboard_reporter::KegboardReporter *r) { this->reporter_ = r; }
   void set_offline_policy(OfflinePolicy p) { this->offline_policy_ = p; }
-  void set_max_grant_duration_ms(uint32_t v) { this->grants_.set_max_duration_ms(v); }
+  void set_max_grant_duration_ms(uint32_t v) { this->max_grant_duration_ms_ = v; }
 
   void set_authorized_binary_sensor(binary_sensor::BinarySensor *s) { this->authorized_sensor_ = s; }
 
@@ -60,7 +59,7 @@ class KegboardAuth : public Component {
   /// Revoke every grant, e.g. a manual lockout.
   void revoke_all();
 
-  bool is_authorized() const { return this->grants_.any_active(); }
+  bool is_authorized() const { return this->engine_ != nullptr && this->engine_->any_active(); }
 
  protected:
   kegboard_reporter::CommandOutcome handle_command_(const std::string &type, JsonObjectConst data,
@@ -68,30 +67,17 @@ class KegboardAuth : public Component {
   kegboard_reporter::CommandOutcome handle_authorize_(JsonObjectConst data, std::string &message);
   kegboard_reporter::CommandOutcome handle_deauthorize_(JsonObjectConst data, std::string &message);
 
-  /// Policy point: what a grant does to a pour already in flight on a meter
-  /// it starts covering (authenticated-pouring §8, case 2).
-  void adopt_in_flight_pour_(kegboard_meter::KegboardMeter *meter);
-
-  /// Act on grant endings: end in-flight pours (the pour event precedes the
-  /// grant_end, protocol §5.7), clear attribution, release relays no longer
-  /// named by any grant, queue grant_end events, fire on_revoked.
-  void process_ends_(const std::vector<kbcore::GrantEnd> &ends);
-
   kegboard_meter::KegboardMeter *meter_by_number_(uint8_t meter);
   void publish_state_();
   void fire_denied_(const std::string &reason);
 
-  kbcore::GrantTable grants_;
+  std::unique_ptr<kbcore::AuthEngine> engine_;
   kegboard_reporter::KegboardReporter *reporter_{nullptr};
   OfflinePolicy offline_policy_{OfflinePolicy::DENY};
+  uint32_t max_grant_duration_ms_{300000};
 
   /// The reporter's meters: the inventory grants are validated against.
   std::vector<kegboard_meter::KegboardMeter *> meters_;
-
-  /// Session volume already fed into the grant table per meter, so loop()
-  /// can hand the table deltas (idle reset + volume limit) while a pour
-  /// runs, and the pour callback can true up the tail.
-  std::map<uint8_t, float> pour_seen_ml_;
 
   /// Set while dispatching commands from a token-ask response, so the absence
   /// of any decision can be detected (treated as deny, per the doc).

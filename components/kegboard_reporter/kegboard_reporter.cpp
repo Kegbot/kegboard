@@ -18,12 +18,6 @@ namespace esphome::kegboard_reporter {
 
 static const char *const TAG = "kegboard_reporter";
 
-static constexpr uint32_t MAX_RETRY_INTERVAL_MS = 300000;
-/// Fast pairing poll for the first minute after boot, then heartbeat cadence.
-static constexpr uint32_t PAIRING_FAST_POLL_MS = 5000;
-static constexpr uint32_t PAIRING_FAST_WINDOW_MS = 60000;
-static constexpr size_t COMMAND_DEDUP_WINDOW = 16;
-
 /// Fixed-size flash slot for the provisioned bearer token.
 struct TokenStore {
   char token[96];
@@ -44,7 +38,7 @@ void KegboardReporter::setup() {
 
   this->load_token_();
 
-  this->pairing_started_ms_ = millis();
+  this->delivery_.pairing_started(millis());
   this->next_heartbeat_ms_ = millis() + this->heartbeat_ms_;
   this->enqueue_status_(true);
   this->publish_diagnostics_();
@@ -99,8 +93,7 @@ void KegboardReporter::enqueue_(kbcore::Event &&event, bool reset_backoff) {
     ESP_LOGW(TAG, "Event queue full; dropped the oldest event (%" PRIu32 " total)", this->queue_.dropped());
   // A pour or token event is worth an immediate attempt even mid-backoff;
   // status heartbeats and command acks wait their turn.
-  if (reset_backoff)
-    this->next_attempt_ms_ = millis();
+  this->delivery_.note_enqueue(reset_backoff, millis());
   this->publish_diagnostics_();
 }
 
@@ -229,7 +222,7 @@ void KegboardReporter::collect_pour_updates_(std::vector<kbcore::Event> &out) {
 }
 
 void KegboardReporter::loop() {
-  if (this->denied_ || this->reporting_url_.empty() || this->http_ == nullptr)
+  if (this->delivery_.denied() || this->reporting_url_.empty() || this->http_ == nullptr)
     return;
 
   const uint32_t now = millis();
@@ -242,15 +235,14 @@ void KegboardReporter::loop() {
   std::vector<kbcore::Event> updates;
   this->collect_pour_updates_(updates);
 
-  const bool due = static_cast<int32_t>(now - this->next_attempt_ms_) >= 0;
-  if (!updates.empty() || (due && !this->queue_.empty())) {
+  if (!updates.empty() || (this->delivery_.due(now) && !this->queue_.empty())) {
     this->send_batch_(std::move(updates));
     this->publish_diagnostics_();
   }
 }
 
 bool KegboardReporter::send_batch_(std::vector<kbcore::Event> &&ephemeral) {
-  if (this->denied_ || this->reporting_url_.empty() || this->http_ == nullptr)
+  if (this->delivery_.denied() || this->reporting_url_.empty() || this->http_ == nullptr)
     return false;
   // Queued events first (oldest-first), then ephemeral updates in whatever
   // room remains. Ephemeral events are never queued: if this send fails they
@@ -282,7 +274,9 @@ bool KegboardReporter::send_batch_(std::vector<kbcore::Event> &&ephemeral) {
   auto container = this->http_->post(this->reporting_url_, body, headers);
   if (container == nullptr) {
     ESP_LOGW(TAG, "POST failed: no response");
-    this->bump_backoff_();
+    const uint32_t delay_ms = this->delivery_.on_transient(millis());
+    ESP_LOGW(TAG, "Retrying in %" PRIu32 " s (%" PRIu32 " consecutive failures)", delay_ms / 1000,
+             this->delivery_.consecutive_failures());
     return false;
   }
 
@@ -324,51 +318,42 @@ bool KegboardReporter::send_batch_(std::vector<kbcore::Event> &&ephemeral) {
 }
 
 void KegboardReporter::handle_response_(int status, const std::string &body, size_t queued_in_batch) {
-  if (http_request::is_success(status)) {
-    for (size_t i = 0; i < queued_in_batch; i++)
-      this->queue_.pop();
-    this->consecutive_failures_ = 0;
-    this->next_attempt_ms_ = millis();
-    this->dispatch_commands_(body);
-    return;
-  }
-
-  if (status == 401) {
-    // Includes a revoked or rotated token: drop it and re-enter pairing.
-    if (this->is_paired()) {
-      ESP_LOGW(TAG, "Token rejected; re-entering pairing");
-      this->bearer_token_.clear();
-      this->save_token_("");
-      this->pairing_started_ms_ = millis();
+  switch (kbcore::classify_status(status)) {
+    case kbcore::BatchDisposition::ACCEPTED: {
+      for (size_t i = 0; i < queued_in_batch; i++)
+        this->queue_.pop();
+      this->delivery_.on_accepted(millis());
+      this->dispatch_commands_(body);
+      return;
     }
-    this->handle_pairing_(body);
-    return;
+    case kbcore::BatchDisposition::PAIRING: {
+      // Includes a revoked or rotated token: drop it and re-enter pairing.
+      if (this->is_paired()) {
+        ESP_LOGW(TAG, "Token rejected; re-entering pairing");
+        this->bearer_token_.clear();
+        this->save_token_("");
+        this->delivery_.pairing_started(millis());
+      }
+      this->handle_pairing_(body);
+      return;
+    }
+    case kbcore::BatchDisposition::REJECTED: {
+      // The batch can never succeed; retrying cannot help.
+      ESP_LOGE(TAG, "Server rejected batch (%d); dropping %u events", status, static_cast<unsigned>(queued_in_batch));
+      for (size_t i = 0; i < queued_in_batch; i++)
+        this->queue_.pop();
+      this->extra_dropped_ += queued_in_batch;
+      this->delivery_.on_rejected(millis());
+      return;
+    }
+    case kbcore::BatchDisposition::TRANSIENT: {
+      ESP_LOGW(TAG, "Delivery failed (%d)", status);
+      const uint32_t delay_ms = this->delivery_.on_transient(millis());
+      ESP_LOGW(TAG, "Retrying in %" PRIu32 " s (%" PRIu32 " consecutive failures)", delay_ms / 1000,
+               this->delivery_.consecutive_failures());
+      return;
+    }
   }
-
-  if (status >= 400 && status < 500) {
-    // The batch can never succeed; retrying cannot help.
-    ESP_LOGE(TAG, "Server rejected batch (%d); dropping %u events", status, static_cast<unsigned>(queued_in_batch));
-    for (size_t i = 0; i < queued_in_batch; i++)
-      this->queue_.pop();
-    this->extra_dropped_ += queued_in_batch;
-    this->next_attempt_ms_ = millis();
-    return;
-  }
-
-  ESP_LOGW(TAG, "Delivery failed (%d)", status);
-  this->bump_backoff_();
-}
-
-void KegboardReporter::bump_backoff_() {
-  this->consecutive_failures_++;
-  uint32_t delay_ms = this->retry_interval_ms_;
-  for (uint32_t i = 1; i < this->consecutive_failures_ && delay_ms < MAX_RETRY_INTERVAL_MS; i++)
-    delay_ms *= 2;
-  if (delay_ms > MAX_RETRY_INTERVAL_MS)
-    delay_ms = MAX_RETRY_INTERVAL_MS;
-  this->next_attempt_ms_ = millis() + delay_ms;
-  ESP_LOGW(TAG, "Retrying in %" PRIu32 " s (%" PRIu32 " consecutive failures)", delay_ms / 1000,
-           this->consecutive_failures_);
 }
 
 void KegboardReporter::handle_pairing_(const std::string &body) {
@@ -392,20 +377,18 @@ void KegboardReporter::handle_pairing_(const std::string &body) {
     this->bearer_token_ = token;
     this->save_token_(token);
     // Deliver the queued backlog under the new identity immediately.
-    this->next_attempt_ms_ = millis();
+    this->delivery_.on_pairing_allowed(millis());
     return;
   }
 
   if (state == "denied") {
     ESP_LOGW(TAG, "Pairing denied by server; stopping until reboot");
-    this->denied_ = true;
+    this->delivery_.on_pairing_denied();
     return;
   }
 
   // Pending: poll fast for the first minute, then at heartbeat cadence.
-  const uint32_t since_start = millis() - this->pairing_started_ms_;
-  const uint32_t interval = since_start < PAIRING_FAST_WINDOW_MS ? PAIRING_FAST_POLL_MS : this->heartbeat_ms_;
-  this->next_attempt_ms_ = millis() + interval;
+  this->delivery_.on_pairing_pending(millis());
   ESP_LOGI(TAG, "Pairing pending; approve this device (%s) on the server dashboard",
            this->hub_ != nullptr ? this->hub_->serial_number().c_str() : "kegboard");
 }
@@ -421,26 +404,19 @@ void KegboardReporter::dispatch_commands_(const std::string &body) {
 
     for (JsonObjectConst cmd : commands) {
       // No id means nothing can be acknowledged; skip. A missing type is
-      // acknowledged `unsupported` like any unknown type (protocol §10).
+      // acknowledged `unsupported` like any unknown type.
       if (!cmd["id"].is<const char *>())
         continue;
       const std::string id = cmd["id"].as<const char *>();
       const std::string type = cmd["type"].is<const char *>() ? cmd["type"].as<const char *>() : "";
 
-      const AppliedCommand *applied = nullptr;
-      for (const auto &recent : this->recent_commands_) {
-        if (recent.id == id) {
-          applied = &recent;
-          break;
-        }
-      }
+      const char *applied = this->delivery_.command_result(id);
       if (applied != nullptr) {
         // The server re-sends until it sees a command_result; the earlier
         // ack may have been evicted before delivery. Re-acknowledge without
         // re-applying.
-        ESP_LOGD(TAG, "Command %s re-delivered; re-acking %s", id.c_str(), applied->result);
-        this->enqueue_(this->make_event_("command_result", kbcore::command_result_data_json(id, applied->result, "")),
-                       false);
+        ESP_LOGD(TAG, "Command %s re-delivered; re-acking %s", id.c_str(), applied);
+        this->enqueue_(this->make_event_("command_result", kbcore::command_result_data_json(id, applied, "")), false);
         continue;
       }
 
@@ -453,9 +429,7 @@ void KegboardReporter::dispatch_commands_(const std::string &body) {
       const char *result = outcome == CommandOutcome::OK      ? "ok"
                            : outcome == CommandOutcome::ERROR ? "error"
                                                               : "unsupported";
-      this->recent_commands_.push_back(AppliedCommand{id, result});
-      if (this->recent_commands_.size() > COMMAND_DEDUP_WINDOW)
-        this->recent_commands_.erase(this->recent_commands_.begin());
+      this->delivery_.record_command(id, result);
 
       ESP_LOGD(TAG, "Command %s (%s) -> %s", id.c_str(), type.c_str(), result);
       this->enqueue_(this->make_event_("command_result", kbcore::command_result_data_json(id, result, message)), false);
