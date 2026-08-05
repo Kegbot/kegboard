@@ -15,6 +15,10 @@
 #include "esphome/core/component.h"
 #include "esphome/core/preferences.h"
 
+namespace esphome::switch_ {
+class Switch;
+}  // namespace esphome::switch_
+
 namespace esphome::kegboard_reporter {
 
 /// Outcome a command handler reports back, mirroring command_result.
@@ -49,7 +53,16 @@ class KegboardReporter : public Component {
   void set_retry_interval_ms(uint32_t v) { this->retry_interval_ms_ = v; }
 
   void add_meter(kegboard_meter::KegboardMeter *meter);
+  /// Register a numbered relay (protocol relay_number → the relay to drive).
+  /// Reported in the status inventory; the targets of grant relay sets.
+  void add_relay(uint8_t relay_number, switch_::Switch *relay);
   void add_thermo_sensor(sensor::Sensor *sensor, const std::string &name);
+
+  /// Device inventory lookups, for grant validation and application (auth).
+  kegboard_meter::KegboardMeter *meter_by_number(uint8_t meter_number) const;
+  switch_::Switch *relay_by_number(uint8_t relay_number) const;
+  bool has_relay(uint8_t relay_number) const;
+  std::vector<kegboard_meter::KegboardMeter *> meter_list() const;
 
   void set_queue_depth_sensor(sensor::Sensor *s) { this->queue_depth_sensor_ = s; }
   void set_dropped_sensor(sensor::Sensor *s) { this->dropped_sensor_ = s; }
@@ -67,7 +80,12 @@ class KegboardReporter : public Component {
 
   /// Emit a token event recording a local decision or a detach.
   void queue_token_event(const std::string &auth_device, const std::string &token, bool attached,
-                         kbcore::TokenStatus status, const std::string &user);
+                         kbcore::TokenStatus status);
+
+  /// Emit a grant_end event (protocol §5.7). Queued normally: it does not
+  /// reset backoff, and when delivery is healthy it goes out on the next
+  /// send.
+  void queue_grant_end(const kbcore::GrantEnd &end);
 
   bool is_paired() const { return !this->bearer_token_.empty(); }
 
@@ -76,6 +94,11 @@ class KegboardReporter : public Component {
     kegboard_meter::KegboardMeter *meter;
     uint32_t last_update_ms{0};
     std::string last_update_pour_id;
+  };
+
+  struct RelayEntry {
+    uint8_t relay_number;
+    switch_::Switch *relay;
   };
 
   kbcore::Event make_event_(const char *type, std::string data_json);
@@ -114,6 +137,7 @@ class KegboardReporter : public Component {
   uint32_t extra_dropped_{0};
 
   std::vector<MeterState> meters_;
+  std::vector<RelayEntry> relays_;
   CommandHandler command_handler_;
 
   uint32_t heartbeat_ms_{60000};
@@ -128,9 +152,15 @@ class KegboardReporter : public Component {
   bool denied_{false};
   uint32_t pairing_started_ms_{0};
 
-  /// Recently applied command ids; the server re-sends until acked, so a
-  /// command may arrive more than once and must be applied only once.
-  std::vector<std::string> recent_command_ids_;
+  /// Recently applied commands and their outcomes; the server re-sends
+  /// until it sees a command_result, so a duplicate is not re-applied but
+  /// is re-acknowledged (the original ack may have been evicted from the
+  /// queue before delivery).
+  struct AppliedCommand {
+    std::string id;
+    const char *result;
+  };
+  std::vector<AppliedCommand> recent_commands_;
 
   ESPPreferenceObject token_pref_;
 

@@ -26,7 +26,7 @@ TEST(pour_data_minimal_has_only_required_fields) {
   d.duration_ms = 7100;
   const std::string json = pour_data_json(d);
 
-  CHECK_EQ(json, std::string(R"({"meter":1,"pour_id":"5f8e2c34-9d1b-4a7e-b02c-8f13d9a6e415",)"
+  CHECK_EQ(json, std::string(R"({"meter_number":1,"pour_id":"5f8e2c34-9d1b-4a7e-b02c-8f13d9a6e415",)"
                              R"("volume_ml":355.000,"duration_ms":7100})"));
 }
 
@@ -36,19 +36,21 @@ TEST(pour_data_full_includes_optionals) {
   d.pour_id = "5f8e2c34-9d1b-4a7e-b02c-8f13d9a6e415";
   d.volume_ml = 355.2f;
   d.duration_ms = 7100;
-  d.user = "mikey";
   d.auth_device = "core.rfid";
   d.auth_token = "0089f2c4";
+  d.grant_id = "g_5501";
   d.ticks = 1919;
   d.ml_per_tick = 0.185f;
   d.tick_series = "0:3 100:14";
   const std::string json = pour_data_json(d);
 
   CHECK(json.find("\"pour_id\":\"5f8e2c34") != std::string::npos);
-  CHECK(json.find("\"user\":\"mikey\"") != std::string::npos);
+  CHECK(json.find("\"grant_id\":\"g_5501\"") != std::string::npos);
   CHECK(json.find("\"ticks\":1919") != std::string::npos);
   CHECK(json.find("\"ml_per_tick\":0.1850") != std::string::npos);
   CHECK(json.find("\"tick_series\":\"0:3 100:14\"") != std::string::npos);
+  // Identity never travels: there is no user field to emit.
+  CHECK_EQ(json.find("\"user\""), std::string::npos);
 }
 
 TEST(pour_data_zero_ticks_is_still_emitted) {
@@ -64,12 +66,11 @@ TEST(pour_data_zero_ticks_is_still_emitted) {
 }
 
 TEST(token_data_status_absent_means_server_decides) {
-  const std::string ask = token_data_json("core.rfid", "0089f2c4", true, TokenStatus::NONE, "");
+  const std::string ask = token_data_json("core.rfid", "0089f2c4", true, TokenStatus::NONE);
   CHECK_EQ(ask.find("\"status\""), std::string::npos);
 
-  const std::string local = token_data_json("core.rfid", "0089f2c4", true, TokenStatus::ACCEPTED, "mikey");
+  const std::string local = token_data_json("core.rfid", "0089f2c4", true, TokenStatus::ACCEPTED);
   CHECK(local.find("\"status\":\"accepted\"") != std::string::npos);
-  CHECK(local.find("\"user\":\"mikey\"") != std::string::npos);
 }
 
 TEST(status_data_includes_config_always) {
@@ -86,12 +87,51 @@ TEST(status_data_includes_config_always) {
   CHECK(json.find("\"state\":\"boot\"") != std::string::npos);
   CHECK(json.find("\"config\":{\"heartbeat_ms\":60000,\"pour_update_ms\":1000,\"queue_capacity\":16}") !=
         std::string::npos);
-  // No meters were provided; the optional array is absent.
+  // No meters or relays were provided; the optional arrays are absent.
   CHECK_EQ(json.find("\"meters\""), std::string::npos);
+  CHECK_EQ(json.find("\"relays\""), std::string::npos);
+}
+
+TEST(status_data_relays_inventory) {
+  StatusData d;
+  d.boot = false;
+  d.fw_version = "4.0.0";
+  d.uptime_ms = 1234;
+  d.events_dropped = 0;
+  d.heartbeat_ms = 60000;
+  d.pour_update_ms = 1000;
+  d.queue_capacity = 16;
+  d.relays = {0, 1};
+  const std::string json = status_data_json(d);
+
+  CHECK(json.find("\"relays\":[{\"relay_number\":0},{\"relay_number\":1}]") != std::string::npos);
+}
+
+TEST(grant_end_data_omits_empty_grant_id) {
+  GrantEnd end;
+  end.meters = {0, 2};
+  end.reason = GrantEndReason::MAX_VOLUME;
+  end.auth_device = "core.rfid";
+  end.token = "0089f2c4";
+  end.grant_id = "g_5501";
+  end.volume_ml = 2004.9f;
+  end.duration_ms = 84200;
+  const std::string json = grant_end_data_json(end);
+
+  CHECK(json.find("\"meter_numbers\":[0,2]") != std::string::npos);
+  CHECK(json.find("\"reason\":\"max_volume\"") != std::string::npos);
+  CHECK(json.find("\"grant_id\":\"g_5501\"") != std::string::npos);
+  CHECK(json.find("\"auth_token\":\"0089f2c4\"") != std::string::npos);
+  CHECK(json.find("\"volume_ml\":2004.900") != std::string::npos);
+  CHECK(json.find("\"duration_ms\":84200") != std::string::npos);
+
+  // Local grants report no grant_id at all.
+  end.grant_id.clear();
+  CHECK_EQ(grant_end_data_json(end).find("\"grant_id\""), std::string::npos);
 }
 
 TEST(batch_age_is_computed_from_send_time) {
-  Event e = make_event(17, "pour", 1000, R"({"meter":0,"pour_id":"x","volume_ml":1.000,"duration_ms":1})");
+  Event e = make_event(17, "pour", 1000, R"({"meter_number":0,"pour_id":"x","volume_ml":1.000,"duration_ms":1})");
   const std::string json = serialize_batch("kegboard-a1b2c3", "9f3a2c1b", 5000, {&e});
 
   CHECK(json.find("\"age_ms\":4000") != std::string::npos);
@@ -104,7 +144,7 @@ TEST(batch_age_is_computed_from_send_time) {
 }
 
 TEST(batch_age_survives_millis_rollover) {
-  Event e = make_event(1, "pour", 0xFFFFFF00u, R"({"meter":0,"pour_id":"x","volume_ml":1.000,"duration_ms":1})");
+  Event e = make_event(1, "pour", 0xFFFFFF00u, R"({"meter_number":0,"pour_id":"x","volume_ml":1.000,"duration_ms":1})");
   const std::string json = serialize_batch("d", "b", 500, {&e});
   // 0x100 + 500 = 756 ms elapsed across the wrap.
   CHECK(json.find("\"age_ms\":756") != std::string::npos);
@@ -156,9 +196,9 @@ static int emit_samples(const char *dir) {
   full.pour_id = "5f8e2c34-9d1b-4a7e-b02c-8f13d9a6e415";
   full.volume_ml = 355.2f;
   full.duration_ms = 7100;
-  full.user = "mikey";
   full.auth_device = "core.rfid";
   full.auth_token = "0089f2c4";
+  full.grant_id = "g_5501";
   full.ticks = 1919;
   full.ml_per_tick = 0.185f;
   full.tick_series = "0:3 100:14 200:31";
@@ -181,6 +221,16 @@ static int emit_samples(const char *dir) {
   st.queue_capacity = 16;
   st.meters.push_back({0, 920791, 0.185f});
   st.meters.push_back({1, 42031, 0.185f});
+  st.relays = {0, 1};
+
+  GrantEnd end;
+  end.meters = {0};
+  end.reason = GrantEndReason::MAX_VOLUME;
+  end.auth_device = "core.rfid";
+  end.token = "0089f2c4";
+  end.grant_id = "g_5501";
+  end.volume_ml = 2004.9f;
+  end.duration_ms = 84200;
 
   struct Sample {
     const char *name;
@@ -188,20 +238,20 @@ static int emit_samples(const char *dir) {
   };
   Sample samples[] = {
       {"pour-full", {}},   {"pour-minimal", {}},   {"pour-update", {}}, {"temperature", {}},    {"token-ask", {}},
-      {"token-local", {}}, {"token-detached", {}}, {"status", {}},      {"command-result", {}},
+      {"token-local", {}}, {"token-detached", {}}, {"status", {}},      {"command-result", {}}, {"grant-end", {}},
   };
   samples[0].event = Event{17, "pour", 1000, "2026-08-03T18:02:11Z", pour_data_json(full)};
   samples[1].event = Event{18, "pour", 1500, "", pour_data_json(minimal)};
   samples[2].event = Event{19, "pour_update", 2000, "", pour_update_data_json(0, full.pour_id, 120.4f, 2400)};
   samples[3].event = Event{20, "temperature", 2500, "", temperature_data_json("thermo-28ff641d8fbb0517", 4.25f)};
-  samples[4].event =
-      Event{21, "token", 3000, "", token_data_json("core.rfid", "0089f2c4", true, TokenStatus::NONE, "")};
-  samples[5].event = Event{22, "token", 3100, "",
-                           token_data_json("onewire", "0000000012345678", true, TokenStatus::ACCEPTED, "mikey")};
+  samples[4].event = Event{21, "token", 3000, "", token_data_json("core.rfid", "0089f2c4", true, TokenStatus::NONE)};
+  samples[5].event =
+      Event{22, "token", 3100, "", token_data_json("onewire", "0000000012345678", true, TokenStatus::ACCEPTED)};
   samples[6].event =
-      Event{23, "token", 3200, "", token_data_json("onewire", "0000000012345678", false, TokenStatus::NONE, "")};
+      Event{23, "token", 3200, "", token_data_json("onewire", "0000000012345678", false, TokenStatus::NONE)};
   samples[7].event = Event{24, "status", 3300, "", status_data_json(st)};
   samples[8].event = Event{25, "command_result", 3400, "", command_result_data_json("cmd_8f21", "ok", "")};
+  samples[9].event = Event{26, "grant_end", 3500, "", grant_end_data_json(end)};
 
   // One batch per sample, plus one combined batch exercising multiple events.
   std::vector<const Event *> all;
@@ -240,6 +290,8 @@ int main(int argc, char **argv) {
   RUN(pour_data_zero_ticks_is_still_emitted);
   RUN(token_data_status_absent_means_server_decides);
   RUN(status_data_includes_config_always);
+  RUN(status_data_relays_inventory);
+  RUN(grant_end_data_omits_empty_grant_id);
   RUN(batch_age_is_computed_from_send_time);
   RUN(batch_age_survives_millis_rollover);
   RUN(batch_omits_time_when_clock_never_synced);

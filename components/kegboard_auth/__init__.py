@@ -1,13 +1,14 @@
 """Authorization for taps, per docs/authenticated-pouring.md.
 
-Turns token events from any reader into per-meter grants: asks the server to
-decide (server mode) or accepts everything as guest (local mode), drives the
-gate toggles, and attributes pours.
+Turns token events from any reader into grants: asks the server to decide
+(server mode) or accepts everything as guest (local mode), drives relays,
+and tags pours for server-side attribution. The device never learns user
+identity.
 """
 
 from esphome import automation
 import esphome.codegen as cg
-from esphome.components import binary_sensor, switch, text_sensor
+from esphome.components import binary_sensor, switch
 import esphome.config_validation as cv
 from esphome.const import CONF_DEVICE, CONF_ID, CONF_MODE, CONF_TRIGGER_ID
 import esphome.final_validate as fv
@@ -17,7 +18,7 @@ from ..kegboard_reporter import KegboardReporter
 
 CODEOWNERS = ["@mikey"]
 DEPENDENCIES = ["kegboard"]
-AUTO_LOAD = ["binary_sensor", "text_sensor"]
+AUTO_LOAD = ["binary_sensor"]
 
 CONF_AUTHORIZED = "authorized"
 CONF_GATES = "gates"
@@ -28,10 +29,9 @@ CONF_OFFLINE_POLICY = "offline_policy"
 CONF_ON_AUTHORIZED = "on_authorized"
 CONF_ON_DENIED = "on_denied"
 CONF_ON_REVOKED = "on_revoked"
+CONF_RELAY = "relay"
 CONF_REPORTER_ID = "reporter_id"
-CONF_TOGGLE = "toggle"
 CONF_TOKEN = "token"
-CONF_USER = "user"
 
 kegboard_auth_ns = cg.esphome_ns.namespace("kegboard_auth")
 KegboardAuth = kegboard_auth_ns.class_("KegboardAuth", cg.Component)
@@ -43,7 +43,7 @@ OfflinePolicy = kegboard_auth_ns.enum("OfflinePolicy", is_class=True)
 OFFLINE_POLICIES = {"deny": OfflinePolicy.DENY, "guest": OfflinePolicy.GUEST}
 
 AuthorizedTrigger = kegboard_auth_ns.class_(
-    "AuthorizedTrigger", automation.Trigger.template(cg.std_string)
+    "AuthorizedTrigger", automation.Trigger.template(cg.std_string, cg.std_string)
 )
 DeniedTrigger = kegboard_auth_ns.class_(
     "DeniedTrigger", automation.Trigger.template(cg.std_string)
@@ -61,10 +61,12 @@ AuthorizedCondition = kegboard_auth_ns.class_(
 
 GATE_SCHEMA = cv.Schema(
     {
+        # Local mode only: which valve a locally accepted token opens. In
+        # server mode each grant names its own meters and relays.
         cv.Required(CONF_METER): cv.use_id(KegboardMeter),
         # Typically a relay driving a solenoid valve. Omit for
         # attribution-only gating.
-        cv.Optional(CONF_TOGGLE): cv.use_id(switch.Switch),
+        cv.Optional(CONF_RELAY): cv.use_id(switch.Switch),
     }
 )
 
@@ -101,6 +103,16 @@ def _final_validate(config):
 FINAL_VALIDATE_SCHEMA = _final_validate
 
 
+def _validate_local_mode_has_gates(config):
+    if config[CONF_MODE] == "local" and not config[CONF_GATES]:
+        raise cv.Invalid(
+            "`mode: local` needs at least one gate listing the meters tokens "
+            "may pour on. `relay:` is optional — omit it for meters without "
+            "valves. (Monitoring-only boards need no kegboard_auth at all.)"
+        )
+    return config
+
+
 CONFIG_SCHEMA = cv.All(
     cv.Schema(
         {
@@ -113,16 +125,19 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_OFFLINE_POLICY, default="deny"): cv.one_of(
                 *OFFLINE_POLICIES, lower=True
             ),
-            # Device-side safety backstop on server-issued grants.
-            cv.Optional(
-                CONF_MAX_GRANT_DURATION, default="5min"
-            ): cv.positive_time_period_milliseconds,
+            # Device-side safety backstop on server-issued grants. Bounded
+            # so the rollover-safe expiry math (32-bit signed millisecond
+            # differences) stays valid.
+            cv.Optional(CONF_MAX_GRANT_DURATION, default="5min"): cv.All(
+                cv.positive_time_period_milliseconds,
+                cv.Range(max=cv.TimePeriod(hours=24)),
+            ),
             # Grant length for local mode and offline-guest grants.
-            cv.Optional(
-                CONF_LOCAL_GRANT_DURATION, default="30s"
-            ): cv.positive_time_period_milliseconds,
+            cv.Optional(CONF_LOCAL_GRANT_DURATION, default="30s"): cv.All(
+                cv.positive_time_period_milliseconds,
+                cv.Range(max=cv.TimePeriod(hours=24)),
+            ),
             cv.Optional(CONF_AUTHORIZED): binary_sensor.binary_sensor_schema(),
-            cv.Optional(CONF_USER): text_sensor.text_sensor_schema(),
             cv.Optional(CONF_ON_AUTHORIZED): automation.validate_automation(
                 {cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(AuthorizedTrigger)}
             ),
@@ -134,6 +149,7 @@ CONFIG_SCHEMA = cv.All(
             ),
         }
     ).extend(cv.COMPONENT_SCHEMA),
+    _validate_local_mode_has_gates,
 )
 
 
@@ -151,23 +167,24 @@ async def to_code(config):
 
     for gate in config[CONF_GATES]:
         meter = await cg.get_variable(gate[CONF_METER])
-        if CONF_TOGGLE in gate:
-            toggle = await cg.get_variable(gate[CONF_TOGGLE])
-            cg.add(var.add_gate(meter, toggle))
+        if CONF_RELAY in gate:
+            relay = await cg.get_variable(gate[CONF_RELAY])
+            cg.add(var.add_gate(meter, relay))
         else:
             cg.add(var.add_gate(meter, cg.nullptr))
 
     if CONF_AUTHORIZED in config:
         sens = await binary_sensor.new_binary_sensor(config[CONF_AUTHORIZED])
         cg.add(var.set_authorized_binary_sensor(sens))
-    if CONF_USER in config:
-        sens = await text_sensor.new_text_sensor(config[CONF_USER])
-        cg.add(var.set_user_text_sensor(sens))
 
     for conf in config.get(CONF_ON_AUTHORIZED, []):
         trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID])
         cg.add(var.add_on_authorized_trigger(trigger))
-        await automation.build_automation(trigger, [(cg.std_string, "user")], conf)
+        await automation.build_automation(
+            trigger,
+            [(cg.std_string, "auth_device"), (cg.std_string, "token")],
+            conf,
+        )
 
     for conf in config.get(CONF_ON_DENIED, []):
         trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID])

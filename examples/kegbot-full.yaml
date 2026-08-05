@@ -138,19 +138,18 @@ kegboard_onewire:
 
 kegboard_auth:
   id: auth
-  # The server decides who may pour and which meters open; grants ride back
-  # in the same round trip as the token event. Use `mode: local` for a
-  # serverless allow-everyone setup.
+  # The server decides who may pour; each grant rides back in the same round
+  # trip as the token event, naming the meters it covers, the relays it
+  # opens, and its limits. Use `mode: local` for a serverless
+  # allow-everyone setup (gates below say which valve a local token opens).
   mode: server
   offline_policy: deny
   gates:
     - meter: flow0
-      toggle: relay0
+      relay: relay0
     - meter: flow1
   authorized:
     name: Tap Authorized
-  user:
-    name: Current Drinker
   on_authorized:
     - script.execute: play_auth_melody
   on_denied:
@@ -165,6 +164,11 @@ kegboard_reporter:
   id: reporter
   reporting_url: !secret kegboard_reporting_url
   meters: [flow0, flow1]
+  relays:
+    - relay_number: 0
+      relay: relay0
+    - relay_number: 1
+      relay: relay1
   thermo_sensors:
     - sensor: keg_temp
       name: thermo-keg

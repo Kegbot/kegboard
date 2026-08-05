@@ -5,7 +5,7 @@ endpoint, pairing, and server command dispatch.
 """
 
 import esphome.codegen as cg
-from esphome.components import sensor, time
+from esphome.components import sensor, switch, time
 from esphome.components.http_request import (
     CONF_HTTP_REQUEST_ID,
     HttpRequestComponent,
@@ -34,6 +34,9 @@ CONF_HEARTBEAT_INTERVAL = "heartbeat_interval"
 CONF_METERS = "meters"
 CONF_POUR_UPDATE_INTERVAL = "pour_update_interval"
 CONF_QUEUE_DEPTH = "queue_depth"
+CONF_RELAY = "relay"
+CONF_RELAY_NUMBER = "relay_number"
+CONF_RELAYS = "relays"
 CONF_RETRY_INTERVAL = "retry_interval"
 CONF_THERMO_SENSORS = "thermo_sensors"
 
@@ -55,6 +58,25 @@ THERMO_SENSOR_SCHEMA = cv.Schema(
     }
 )
 
+RELAY_SCHEMA = cv.Schema(
+    {
+        # The protocol's relay number: reported in the status inventory and
+        # the target of grant relay sets (and, later, set_relay).
+        cv.Required(CONF_RELAY_NUMBER): cv.int_range(min=0, max=255),
+        cv.Required(CONF_RELAY): cv.use_id(switch.Switch),
+    }
+)
+
+
+def _validate_unique_relay_numbers(relays):
+    seen = set()
+    for relay in relays:
+        number = relay[CONF_RELAY_NUMBER]
+        if number in seen:
+            raise cv.Invalid(f"Duplicate relay_number {number}")
+        seen.add(number)
+    return relays
+
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(KegboardReporter),
@@ -67,6 +89,9 @@ CONFIG_SCHEMA = cv.Schema(
         # token by pairing via the server dashboard.
         cv.Required(CONF_REPORTING_URL): validate_reporting_url,
         cv.Optional(CONF_METERS, default=[]): cv.ensure_list(cv.use_id(KegboardMeter)),
+        cv.Optional(CONF_RELAYS, default=[]): cv.All(
+            cv.ensure_list(RELAY_SCHEMA), _validate_unique_relay_numbers
+        ),
         cv.Optional(CONF_THERMO_SENSORS, default=[]): cv.ensure_list(
             THERMO_SENSOR_SCHEMA
         ),
@@ -109,6 +134,10 @@ async def to_code(config):
 
     for meter_id in config[CONF_METERS]:
         cg.add(var.add_meter(await cg.get_variable(meter_id)))
+
+    for conf in config[CONF_RELAYS]:
+        relay = await cg.get_variable(conf[CONF_RELAY])
+        cg.add(var.add_relay(conf[CONF_RELAY_NUMBER], relay))
 
     for conf in config[CONF_THERMO_SENSORS]:
         thermo = await cg.get_variable(conf[CONF_SENSOR])

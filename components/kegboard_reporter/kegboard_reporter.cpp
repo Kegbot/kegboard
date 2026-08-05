@@ -5,6 +5,7 @@
 #include <cstring>
 #include <ctime>
 
+#include "esphome/core/application.h"
 #include "esphome/core/hal.h"
 #include "esphome/core/helpers.h"
 #include "esphome/core/log.h"
@@ -21,7 +22,7 @@ static constexpr uint32_t MAX_RETRY_INTERVAL_MS = 300000;
 /// Fast pairing poll for the first minute after boot, then heartbeat cadence.
 static constexpr uint32_t PAIRING_FAST_POLL_MS = 5000;
 static constexpr uint32_t PAIRING_FAST_WINDOW_MS = 60000;
-static constexpr size_t COMMAND_DEDUP_WINDOW = 8;
+static constexpr size_t COMMAND_DEDUP_WINDOW = 16;
 
 /// Fixed-size flash slot for the provisioned bearer token.
 struct TokenStore {
@@ -111,14 +112,44 @@ void KegboardReporter::add_meter(kegboard_meter::KegboardMeter *meter) {
     d.pour_id = m.pour_id();
     d.volume_ml = record.volume_ml;
     d.duration_ms = record.duration_ms;
-    d.user = m.active_user();
     d.auth_device = m.active_auth_device();
     d.auth_token = m.active_auth_token();
+    d.grant_id = m.active_grant_id();
     d.ticks = record.ticks;
     d.ml_per_tick = m.ml_per_tick();
     d.tick_series = record.series.to_string();
     this->enqueue_(this->make_event_("pour", kbcore::pour_data_json(d)));
   });
+}
+
+void KegboardReporter::add_relay(uint8_t relay_number, switch_::Switch *relay) {
+  this->relays_.push_back(RelayEntry{relay_number, relay});
+}
+
+kegboard_meter::KegboardMeter *KegboardReporter::meter_by_number(uint8_t meter_number) const {
+  for (const auto &state : this->meters_) {
+    if (state.meter->meter_number() == meter_number)
+      return state.meter;
+  }
+  return nullptr;
+}
+
+switch_::Switch *KegboardReporter::relay_by_number(uint8_t relay_number) const {
+  for (const auto &entry : this->relays_) {
+    if (entry.relay_number == relay_number)
+      return entry.relay;
+  }
+  return nullptr;
+}
+
+bool KegboardReporter::has_relay(uint8_t relay_number) const { return this->relay_by_number(relay_number) != nullptr; }
+
+std::vector<kegboard_meter::KegboardMeter *> KegboardReporter::meter_list() const {
+  std::vector<kegboard_meter::KegboardMeter *> meters;
+  meters.reserve(this->meters_.size());
+  for (const auto &state : this->meters_)
+    meters.push_back(state.meter);
+  return meters;
 }
 
 void KegboardReporter::add_thermo_sensor(sensor::Sensor *sensor, const std::string &name) {
@@ -131,15 +162,19 @@ void KegboardReporter::add_thermo_sensor(sensor::Sensor *sensor, const std::stri
 
 bool KegboardReporter::send_token_ask(const std::string &auth_device, const std::string &token) {
   this->enqueue_(
-      this->make_event_("token", kbcore::token_data_json(auth_device, token, true, kbcore::TokenStatus::NONE, "")));
+      this->make_event_("token", kbcore::token_data_json(auth_device, token, true, kbcore::TokenStatus::NONE)));
   // The authorization decision rides the response to this send; commands are
   // dispatched inside send_batch_() before it returns.
   return this->send_batch_({});
 }
 
 void KegboardReporter::queue_token_event(const std::string &auth_device, const std::string &token, bool attached,
-                                         kbcore::TokenStatus status, const std::string &user) {
-  this->enqueue_(this->make_event_("token", kbcore::token_data_json(auth_device, token, attached, status, user)));
+                                         kbcore::TokenStatus status) {
+  this->enqueue_(this->make_event_("token", kbcore::token_data_json(auth_device, token, attached, status)));
+}
+
+void KegboardReporter::queue_grant_end(const kbcore::GrantEnd &end) {
+  this->enqueue_(this->make_event_("grant_end", kbcore::grant_end_data_json(end)), false);
 }
 
 void KegboardReporter::enqueue_status_(bool boot) {
@@ -164,6 +199,8 @@ void KegboardReporter::enqueue_status_(bool boot) {
     m.ml_per_tick = state.meter->ml_per_tick();
     d.meters.push_back(m);
   }
+  for (const auto &entry : this->relays_)
+    d.relays.push_back(entry.relay_number);
   this->enqueue_(this->make_event_("status", kbcore::status_data_json(d)), false);
 }
 
@@ -249,13 +286,29 @@ bool KegboardReporter::send_batch_(std::vector<kbcore::Event> &&ephemeral) {
   }
 
   const int status = container->status_code;
+  // Read the body without trusting Content-Length up front: a chunked
+  // response reports none, and silently dropping the body would drop the
+  // commands in it — including a token-ask decision, which would then read
+  // as "server did not decide". Bounded; protocol responses are small.
+  static constexpr size_t MAX_RESPONSE_BYTES = 8192;
   std::string response;
-  response.resize(container->content_length);
-  if (!response.empty()) {
-    const auto read = http_request::http_read_fully(container.get(), reinterpret_cast<uint8_t *>(&response[0]),
-                                                    response.size(), 512, this->http_->get_timeout());
-    if (read.status != http_request::HttpReadStatus::OK)
-      response.clear();
+  uint8_t chunk[512];
+  uint32_t last_data_ms = millis();
+  while (response.size() < MAX_RESPONSE_BYTES) {
+    const int n = container->read(chunk, sizeof(chunk));
+    App.feed_wdt();
+    yield();
+    const auto step = http_request::http_read_loop_result(n, last_data_ms, this->http_->get_timeout(),
+                                                          container->is_read_complete());
+    if (step == http_request::HttpReadLoopResult::DATA) {
+      response.append(reinterpret_cast<const char *>(chunk), static_cast<size_t>(n));
+      continue;
+    }
+    if (step == http_request::HttpReadLoopResult::RETRY)
+      continue;
+    if (step != http_request::HttpReadLoopResult::COMPLETE)
+      response.clear();  // error/timeout: never parse a truncated body
+    break;
   }
   container->end();
 
@@ -366,23 +419,29 @@ void KegboardReporter::dispatch_commands_(const std::string &body) {
       return true;
 
     for (JsonObjectConst cmd : commands) {
-      if (!cmd["id"].is<const char *>() || !cmd["type"].is<const char *>())
+      // No id means nothing can be acknowledged; skip. A missing type is
+      // acknowledged `unsupported` like any unknown type (protocol §10).
+      if (!cmd["id"].is<const char *>())
         continue;
       const std::string id = cmd["id"].as<const char *>();
-      const std::string type = cmd["type"].as<const char *>();
+      const std::string type = cmd["type"].is<const char *>() ? cmd["type"].as<const char *>() : "";
 
-      bool seen = false;
-      for (const auto &recent : this->recent_command_ids_) {
-        if (recent == id) {
-          seen = true;
+      const AppliedCommand *applied = nullptr;
+      for (const auto &recent : this->recent_commands_) {
+        if (recent.id == id) {
+          applied = &recent;
           break;
         }
       }
-      if (seen)
+      if (applied != nullptr) {
+        // The server re-sends until it sees a command_result; the earlier
+        // ack may have been evicted before delivery. Re-acknowledge without
+        // re-applying.
+        ESP_LOGD(TAG, "Command %s re-delivered; re-acking %s", id.c_str(), applied->result);
+        this->enqueue_(this->make_event_("command_result", kbcore::command_result_data_json(id, applied->result, "")),
+                       false);
         continue;
-      this->recent_command_ids_.push_back(id);
-      if (this->recent_command_ids_.size() > COMMAND_DEDUP_WINDOW)
-        this->recent_command_ids_.erase(this->recent_command_ids_.begin());
+      }
 
       CommandOutcome outcome = CommandOutcome::UNSUPPORTED;
       std::string message;
@@ -393,6 +452,10 @@ void KegboardReporter::dispatch_commands_(const std::string &body) {
       const char *result = outcome == CommandOutcome::OK      ? "ok"
                            : outcome == CommandOutcome::ERROR ? "error"
                                                               : "unsupported";
+      this->recent_commands_.push_back(AppliedCommand{id, result});
+      if (this->recent_commands_.size() > COMMAND_DEDUP_WINDOW)
+        this->recent_commands_.erase(this->recent_commands_.begin());
+
       ESP_LOGD(TAG, "Command %s (%s) -> %s", id.c_str(), type.c_str(), result);
       this->enqueue_(this->make_event_("command_result", kbcore::command_result_data_json(id, result, message)), false);
     }
@@ -421,6 +484,7 @@ void KegboardReporter::dump_config() {
   ESP_LOGCONFIG(TAG, "  Heartbeat: %" PRIu32 " s", this->heartbeat_ms_ / 1000);
   ESP_LOGCONFIG(TAG, "  Pour updates: every %" PRIu32 " ms", this->pour_update_ms_);
   ESP_LOGCONFIG(TAG, "  Meters: %u", static_cast<unsigned>(this->meters_.size()));
+  ESP_LOGCONFIG(TAG, "  Relays: %u", static_cast<unsigned>(this->relays_.size()));
 }
 
 }  // namespace esphome::kegboard_reporter

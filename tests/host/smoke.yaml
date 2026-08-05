@@ -53,6 +53,9 @@ kegboard_reporter:
   id: reporter
   reporting_url: http://kegboard.invalid/kegboard-event
   meters: [flow0]
+  relays:
+    - relay_number: 0
+      relay: valve
 
 switch:
   - platform: template
@@ -65,12 +68,13 @@ kegboard_auth:
   mode: server
   gates:
     - meter: flow0
-      toggle: valve
+      relay: valve
   authorized:
     name: Authorized
-  user:
-    name: Drinker
   on_authorized:
+    - logger.log:
+        format: "Authorized %s/%s"
+        args: [auth_device.c_str(), token.c_str()]
     - kegboard_auth.revoke: auth
 
 # Exercises the failing instantiations: a string-arg automation calling the

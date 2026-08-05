@@ -63,14 +63,15 @@ class KegboardMeter : public Component {
   }
 
   /// Attribution for pours on this meter, set by kegboard_auth while a grant
-  /// is active. Empty user means guest.
-  void set_active_auth(const std::string &user, const std::string &auth_device, const std::string &token) {
-    this->active_user_ = user;
+  /// is active. Empty grant_id means a locally decided grant (the pour's
+  /// grant_id field is omitted); all empty means ungated/guest.
+  void set_active_auth(const std::string &grant_id, const std::string &auth_device, const std::string &token) {
+    this->active_grant_id_ = grant_id;
     this->active_auth_device_ = auth_device;
     this->active_auth_token_ = token;
   }
   void clear_active_auth() { this->set_active_auth("", "", ""); }
-  const std::string &active_user() const { return this->active_user_; }
+  const std::string &active_grant_id() const { return this->active_grant_id_; }
   const std::string &active_auth_device() const { return this->active_auth_device_; }
   const std::string &active_auth_token() const { return this->active_auth_token_; }
 
@@ -116,7 +117,7 @@ class KegboardMeter : public Component {
   sensor::Sensor *flow_rate_sensor_{nullptr};
   binary_sensor::BinarySensor *pouring_sensor_{nullptr};
 
-  std::string active_user_;
+  std::string active_grant_id_;
   std::string active_auth_device_;
   std::string active_auth_token_;
   std::string pour_id_;
