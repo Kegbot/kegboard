@@ -77,6 +77,7 @@ def _validate_unique_relay_numbers(relays):
         seen.add(number)
     return relays
 
+
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(KegboardReporter),
