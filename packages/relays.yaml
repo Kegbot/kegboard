@@ -11,14 +11,18 @@
 # relay left on is usually a solenoid valve held open, and if the thing that
 # turned it on stops talking -- a crashed script, a dropped network, a closed
 # browser tab -- nobody is left to turn it off. Each relay therefore switches
-# itself off after `relay_watchdog_timeout` unless something turns it on again.
+# itself off after `relay_watchdog_timeout` from the moment it turns on.
 #
-# The scripts use `mode: restart`, so re-issuing the on command restarts the
-# timer rather than stacking timers, matching the legacy behaviour where every
-# set_output reset the countdown.
+# The timer runs from the on-edge and cannot be refreshed while the relay is
+# already on (repeated turn_on commands are deduplicated and do not re-fire
+# on_turn_on); an off/on cycle restarts it.
 #
-# Set `relay_watchdog_timeout: 0s` to disable, but consider what is downstream
-# of the relay first.
+# IMPORTANT: if a relay is grant-driven (listed under the reporter's
+# `relays:`), set `relay_watchdog_timeout` LONGER than kegboard_auth's
+# `max_grant_duration` (default 5min) — or `0s` to disable — or the watchdog
+# will close the valve mid-grant. Grant-held relays already have a
+# device-side bound: the grant clamp. The watchdog earns its keep on relays
+# driven manually or from Home Assistant.
 
 substitutions:
   relay_watchdog_timeout: 10s

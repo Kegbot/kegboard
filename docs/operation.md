@@ -70,10 +70,12 @@ upstream as a `grant_end` event naming the reason. Full semantics in
 
 A relay left on is usually a valve held open. Each relay in
 `packages/relays.yaml` starts a watchdog timer when switched on and switches
-itself off after `relay_watchdog_timeout` unless re-triggered; re-issuing the
-on command restarts the timer. Grant-driven relays are additionally
-bounded by the grant clamp — two independent limits between software and
-beer on the floor.
+itself off after `relay_watchdog_timeout`. The timer runs from the on-edge
+and cannot be refreshed while the relay is on; it protects relays driven
+manually or from Home Assistant. Grant-driven relays are bounded by the
+grant clamp (`max_grant_duration`) instead — **set the watchdog longer than
+the clamp** (or `0s`) on relays the server grants, or the watchdog will
+close the valve mid-grant.
 
 ## Buzzer
 
