@@ -420,8 +420,7 @@ class Simulator:
                 data["auth_device"] = grant["auth_device"]
             if grant["token"]:
                 data["auth_token"] = grant["token"]
-            if grant["grant_id"]:
-                data["grant_id"] = grant["grant_id"]
+            data["grant_id"] = grant["grant_id"]
             self.enqueue(self.make_event("grant_end", data))
             self.log(
                 f"[yellow]grant {grant['grant_id']} ended on meters "
@@ -511,7 +510,7 @@ class Simulator:
             state["duration_ms"] = int((step + 1) * POUR_UPDATE_INTERVAL_S * 1000)
             state["series"].append((step * 1000, int(poured / self.ml_per_tick / steps)))
             # POLICY — a grant arriving mid-pour adopts it, and attribution
-            # is read at pour end (authenticated-pouring §9, case 2). Limit
+            # is read at pour end (authenticated-pouring §8, case 2). Limit
             # accounting stays delta-based, so pre-grant volume never counts
             # toward max_volume_ml.
             grant = self.grants.get(meter)

@@ -63,8 +63,7 @@ immediately and the decision (`authorize`/`deny`) returns in the same HTTP
 round trip; grants end at their server-set limits — volume poured, total
 time, idle time — with total time always clamped to `max_grant_duration`,
 on token detach, or on a server `deauthorize`. Every ending is reported
-upstream as a `grant_end` event naming the reason. In `local` mode the
-device decides itself. Full semantics in
+upstream as a `grant_end` event naming the reason. Full semantics in
 [Authenticated Pouring](authenticated-pouring.md).
 
 ## Relays

@@ -253,19 +253,6 @@ TEST(expiry_survives_millis_rollover) {
   CHECK_EQ(t.poll(100 + 30000).size(), 1u);
 }
 
-TEST(local_grants_omit_grant_id_from_endings) {
-  GrantTable t;
-  auto s = spec("local-1", {0});
-  s.local = true;
-  s.max_duration_ms = 30000;
-  t.authorize(s, 1000);
-
-  const auto ends = t.poll(31000);
-  CHECK_EQ(ends.size(), 1u);
-  CHECK(ends[0].grant_id.empty());
-  CHECK_EQ(ends[0].token, std::string("0089f2c4"));
-}
-
 TEST(endings_snapshot_whole_grant_totals) {
   GrantTable t;
   t.authorize(spec("g_1", {0, 1}), 1000);
@@ -308,7 +295,6 @@ TEST_MAIN("grant_table", {
   RUN(update_cannot_extend_past_clamp);
   RUN(idle_limit_expires_without_flow);
   RUN(expiry_survives_millis_rollover);
-  RUN(local_grants_omit_grant_id_from_endings);
   RUN(endings_snapshot_whole_grant_totals);
   RUN(record_flow_on_ungranted_meter_is_noop);
 })

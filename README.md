@@ -49,7 +49,7 @@ Early. Under active construction — see the table below.
 | Core logic (pour detection, event protocol, grants) | Done, unit tested |
 | `kegboard` hub + `kegboard_meter` | Done |
 | `kegboard_reporter` (event protocol, pairing, commands) | Done |
-| `kegboard_auth` (server-decided grants, local mode) | Done |
+| `kegboard_auth` (server-decided grants) | Done |
 | Temperature via stock `dallas_temp` | Works |
 | Relays with watchdog, buzzer, flow LEDs | Done |
 | Auth readers (RFID, iButton) | Done |
@@ -131,17 +131,15 @@ means events were lost and is worth alerting on.
 
 ### `kegboard_auth`
 
-Applies [authenticated pouring](docs/authenticated-pouring.md): per-meter
-grants, decided by the server (or locally), driving valve relays and tagging
-pours for server-side attribution.
+Applies [authenticated pouring](docs/authenticated-pouring.md):
+server-decided grants driving valve relays and tagging pours for server-side
+attribution. Requires a `kegboard_reporter`. (Serverless installs can gate
+valves with plain ESPHome automations on the reader triggers instead.)
 
 | Option | Default | Notes |
 |---|---|---|
-| `mode` | `server` | `server`: every token presentment is decided by the server, whose grants name the meters and relays they apply to and their limits — the device holds no meter↔relay association and never learns user identity. `local`: every token pours as guest, serverlessly. |
-| `gates` | `[]` | **`local` mode only**: `meter:` plus optional `relay:`. A gate without a relay gets attribution only. In `server` mode each grant names its own meters and relays and this option is unused. |
-| `offline_policy` | `deny` | Token presented while the server is unreachable: `deny`, or `guest` (attribution only — never opens valves). |
+| `offline_policy` | `deny` | Token presented while the server is unreachable: `deny` (signal refusal), or `guest` (stay silent; pours proceed as guest pours). Neither opens valves. |
 | `max_grant_duration` | `5min` | Device-side clamp on server-issued grants: the final bound on valve-open time. |
-| `local_grant_duration` | `30s` | Grant length in `local` mode and for offline-guest grants. |
 
 Actions: `kegboard_auth.token_attached` / `.token_detached` (`device`,
 `token`), `.revoke`. Condition: `.is_authorized`. Triggers: `on_authorized`

@@ -6,10 +6,10 @@ Home Assistant, and every board works standalone when the network is down.
 
 ## Standalone
 
-No server, nothing else on the network. The board meters pours, runs local
-automations (`on_pour_start`, `on_pour_end`), and can gate valves with
-`kegboard_auth` in `local` mode — every token pours as guest. Watch it work
-with `esphome logs`.
+No server, nothing else on the network. The board meters pours and runs
+local automations (`on_pour_start`, `on_pour_end`). Token readers still fire
+their triggers, so a serverless board can gate valves with plain ESPHome
+automations if wanted. Watch it work with `esphome logs`.
 
 This is also the right mode for bench work: verify wiring and calibration
 before pointing the board at anything.

@@ -65,10 +65,6 @@ switch:
 
 kegboard_auth:
   id: auth
-  mode: server
-  gates:
-    - meter: flow0
-      relay: valve
   authorized:
     name: Authorized
   on_authorized:

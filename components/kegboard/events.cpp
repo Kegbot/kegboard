@@ -71,8 +71,7 @@ std::string temperature_data_json(const std::string &sensor, float temp_c) {
   return w.str();
 }
 
-std::string token_data_json(const std::string &auth_device, const std::string &token, bool attached,
-                            TokenStatus status) {
+std::string token_data_json(const std::string &auth_device, const std::string &token, bool attached) {
   JsonWriter w;
   w.begin_object();
   w.key("auth_device");
@@ -81,10 +80,6 @@ std::string token_data_json(const std::string &auth_device, const std::string &t
   w.value(token);
   w.key("action");
   w.value(attached ? "attached" : "detached");
-  if (status != TokenStatus::NONE) {
-    w.key("status");
-    w.value(status == TokenStatus::ACCEPTED ? "accepted" : "denied");
-  }
   w.end_object();
   return w.str();
 }
@@ -161,10 +156,8 @@ std::string grant_end_data_json(const GrantEnd &end) {
     w.key("auth_token");
     w.value(end.token);
   }
-  if (!end.grant_id.empty()) {
-    w.key("grant_id");
-    w.value(end.grant_id);
-  }
+  w.key("grant_id");
+  w.value(end.grant_id);
   w.key("volume_ml");
   w.value(end.volume_ml, 3);
   w.key("duration_ms");

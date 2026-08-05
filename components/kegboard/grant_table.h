@@ -23,12 +23,9 @@ enum class GrantEndReason : uint8_t { MAX_VOLUME, MAX_DURATION, MAX_IDLE, DETACH
 /// The protocol string for a reason, e.g. "max_volume".
 const char *grant_end_reason_str(GrantEndReason reason);
 
-/// What an authorize command carries (protocol §7.1), plus the `local` flag
-/// for device-decided grants (local mode, offline-guest), whose ids are
-/// internal and never reported.
+/// What an authorize command carries (protocol §7.1).
 struct GrantSpec {
   std::string grant_id;
-  bool local{false};
   std::vector<uint8_t> meters;
   std::vector<uint8_t> relays;
   std::string auth_device;
@@ -55,7 +52,6 @@ struct Grant {
 /// keeps its relays. `volume_ml`/`duration_ms` are snapshots of the whole
 /// grant, per protocol §5.7.
 struct GrantEnd {
-  /// Empty for local grants: the protocol omits the field.
   std::string grant_id;
   std::string auth_device;
   std::string token;
