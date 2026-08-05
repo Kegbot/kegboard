@@ -156,7 +156,10 @@ void KegboardReporter::add_thermo_sensor(sensor::Sensor *sensor, const std::stri
   sensor->add_on_state_callback([this, name](float value) {
     if (std::isnan(value))
       return;
-    this->enqueue_(this->make_event_("temperature", kbcore::temperature_data_json(name, value)));
+    // Periodic readings must not reset backoff (protocol §9: only pours and
+    // tokens do) — a steadily-sampling sensor would otherwise hammer a down
+    // server at its own cadence forever.
+    this->enqueue_(this->make_event_("temperature", kbcore::temperature_data_json(name, value)), false);
   });
 }
 
