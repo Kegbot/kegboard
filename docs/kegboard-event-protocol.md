@@ -157,9 +157,9 @@ event is created the moment the pour finishes, so
   "pour_id": "5f8e2c34-9d1b-4a7e-b02c-8f13d9a6e415",
   "volume_ml": 355.2,
   "duration_ms": 7100,
-  "user": "mikey",
   "auth_device": "core.rfid",
   "auth_token": "0089f2c4",
+  "grant_id": "g_5501",
   "ticks": 1919,
   "ml_per_tick": 0.185,
   "tick_series": "0:3 100:14 200:31"
@@ -172,12 +172,18 @@ event is created the moment the pour finishes, so
 | `pour_id` | string | yes | Globally unique, **opaque** pour identifier; see §5.2. |
 | `volume_ml` | number | yes | Poured volume. **Authoritative.** Computed on-device from its own calibration. |
 | `duration_ms` | integer | yes | First tick to last tick. |
-| `user` | string | no | Username the pour is attributed to. Absent means unattributed/guest. |
 | `auth_device` | string | no | Reader that authorized the pour (`core.rfid`, `onewire`, ...). |
 | `auth_token` | string | no | Token that authorized the pour. |
+| `grant_id` | string | no | The server-assigned id of the grant that covered this pour (§7.1). Absent for locally decided and ungated pours. |
 | `ticks` | integer | no | Raw tick count. Advisory diagnostic only; servers MUST NOT compute volume from it. |
 | `ml_per_tick` | number | no | Calibration in effect when the pour ended. Diagnostic; lets a server sanity-check `ticks * ml_per_tick ≈ volume_ml`. |
 | `tick_series` | string | no | Space-separated `<offset_ms>:<ticks>` pairs. Diagnostic. |
+
+There is no user field: **the device never learns identity**. The server
+attributes a pour from `grant_id` — which pins it to the server's own
+authorization decision, and so stays correct even if the token is reassigned
+between the pour and a late queued delivery — or, for locally decided
+grants, from `auth_token`. A pour carrying none of these is a guest pour.
 
 ### 5.2 `pour_update`
 
@@ -236,8 +242,7 @@ An auth token arrived or left. Central to server-side authorization; see the
   "auth_device": "onewire",
   "token": "0000000012345678",
   "action": "attached",
-  "status": "accepted",
-  "user": "mikey"
+  "status": "accepted"
 }
 ```
 
@@ -247,7 +252,6 @@ An auth token arrived or left. Central to server-side authorization; see the
 | `token` | string | yes | Token value, lowercase hex by convention. |
 | `action` | string | yes | `attached` or `detached`. |
 | `status` | string | no | On `attached`: `accepted` or `denied` — present only when the device decided locally. Absent means the device is asking the server to decide (see companion doc). |
-| `user` | string | no | Username the token resolved to, if decided locally. |
 
 The device SHOULD flush a batch immediately when a token is attached, since
 authorization latency is the user standing at the tap waiting.
@@ -316,6 +320,57 @@ at-least-once/idempotent semantics as the event channel.
 | `result` | string | yes | `ok`, `error`, or `unsupported`. |
 | `message` | string | no | Human-readable detail on `error`/`unsupported`. |
 
+### 5.7 `grant_end`
+
+Reports that an authorization grant (§7.1) ended, and why. Emitted once per
+ending — including partial endings, where only some of a grant's meters are
+released — for every grant, server-issued or local, so the server gets the
+complete grant lifecycle from this one event type instead of inferring it
+from timers of its own.
+
+```json
+{
+  "meter_numbers": [0],
+  "reason": "max_volume",
+  "auth_device": "core.rfid",
+  "auth_token": "0089f2c4",
+  "grant_id": "g_5501",
+  "volume_ml": 2004.9,
+  "duration_ms": 84200
+}
+```
+
+| Field | Type | Req | Description |
+|---|---|---|---|
+| `meter_numbers` | array of integer | yes | The meters released by this ending. |
+| `reason` | string | yes | Why the grant ended; see below. |
+| `auth_device` / `auth_token` | string | no | Echo of the presentment that created the grant, as on `pour` (§5.1). |
+| `grant_id` | string | no | The server-assigned id of the grant (§7.1). Absent for locally decided grants. |
+| `volume_ml` | number | yes | Total volume poured under the grant, across all its meters — a snapshot at this ending, see below. |
+| `duration_ms` | integer | yes | Grant age at this ending. |
+
+| `reason` | Meaning |
+|---|---|
+| `max_volume` | Cumulative poured volume reached `max_volume_ml`. |
+| `max_duration` | Grant lifetime reached `max_duration_ms` — or the device's own `max_grant_duration` clamp (§7.1). |
+| `max_idle` | No flow on any granted meter for `max_idle_ms`. |
+| `detach` | The grant's token detached (presence readers). |
+| `command` | A server `deauthorize` (§7.3). |
+| `replaced` | An `authorize` — a new grant, or an update to this one — took the listed meters out of this grant's scope (§7.1). |
+
+`volume_ml` and `duration_ms` are **snapshots of the whole grant, not
+deltas**: a partial ending reports the grant's running totals at that
+moment, and the same volume appears again — grown — in the grant's later
+endings. Servers MUST NOT sum `grant_end` volumes; the `pour` events are
+the volume record, and these totals are for cross-checking and display.
+
+A limit ending an in-flight pour ends the pour first, so the final `pour`
+event precedes the `grant_end` in the queue. Reason `command` is redundant
+with the `deauthorize`'s own `command_result` acknowledgment, deliberately:
+a server can track grant lifecycles from `grant_end` alone. Like any event,
+`grant_end` queues and delivers at-least-once (§9) — a grant that ends
+during an outage is reported when connectivity returns.
+
 ## 6. Time model
 
 The device may not have wall-clock time — at boot, before NTP, or on a
@@ -348,7 +403,7 @@ The response to every authenticated 2xx exchange:
 | Field | Type | Req | Description |
 |---|---|---|---|
 | `commands` | array | no | Server→device instructions, oldest first. Absent means none — equivalent to `[]`. |
-| `commands[].id` | string | yes | Server-assigned, opaque. Devices MUST deduplicate on it: a server re-sends a command until it sees a `command_result`, so the same command may arrive more than once. |
+| `commands[].id` | string | yes | Server-assigned, opaque. Devices MUST deduplicate on it: a server re-sends a command until it sees a `command_result`, so the same command may arrive more than once. A duplicate is not re-applied but SHOULD be acknowledged again — the earlier `command_result` may have been lost before delivery. |
 | `commands[].type` | string | yes | Command type. Devices MUST acknowledge unknown types with `result: "unsupported"`. |
 | `commands[].data` | object | yes | Type-specific payload. |
 
@@ -366,8 +421,10 @@ modes and offline behavior — is specified in
 
 ### 7.1 `authorize`
 
-Grants pour access on one or more meters: the device opens the granted
-meters' relays and attributes subsequent pours to the given user. Typically
+Creates — or updates — a grant: the device energizes the grant's relays and
+tags pours on the grant's meters with it. One command carries exactly one
+grant; a server issuing several grants at once — different taps, different
+policy — sends several `authorize` commands in the same response. Typically
 sent in the same response as a decision-requesting `token` event (see
 companion doc), but valid in any response.
 
@@ -376,9 +433,12 @@ companion doc), but valid in any response.
   "id": "cmd_8f21",
   "type": "authorize",
   "data": {
-    "meter_numbers": [0, 2],
-    "user": "mikey",
-    "duration_ms": 30000,
+    "grant_id": "g_5501",
+    "meter_numbers": [0],
+    "relay_numbers": [1],
+    "max_volume_ml": 2000,
+    "max_duration_ms": 120000,
+    "max_idle_ms": 30000,
     "auth_device": "core.rfid",
     "token": "0089f2c4"
   }
@@ -387,26 +447,58 @@ companion doc), but valid in any response.
 
 | Field | Type | Req | Description |
 |---|---|---|---|
-| `meter_numbers` | array of integer | yes | Meter numbers this grant opens. **The server decides the meter set** — this is how one token opens one tap, several, or all. |
-| `user` | string | no | Username to attribute pours to. Absent → guest. |
-| `duration_ms` | integer | yes | Grant lifetime. The device extends expiry while a pour is actively running on a granted meter, so a slow glass is never cut off. |
+| `grant_id` | string | yes | Server-assigned grant identifier: opaque to the device, at most 64 chars. Pours and `grant_end` events echo it (§5.1, §5.7); `deauthorize` revokes by it (§7.3). Naming a live grant's id updates that grant in place (below). |
+| `meter_numbers` | array of integer | yes | Meters this grant covers: pours on them are tagged with the grant, and their flow feeds the volume and idle limits. **The server decides the set** — this is how one token opens one tap, several, or all. |
+| `relay_numbers` | array of integer | no | Relays to energize (typically driving solenoid valves) for the life of the grant. Absent or empty → attribution-only: the meters still meter, no valve is driven. |
+| `max_volume_ml` | number | no | Most the grant may pour, summed across its meters. `0` or absent → unlimited. |
+| `max_duration_ms` | integer | no | Hard cap on grant lifetime, from grant creation — reaching it ends the grant even mid-pour. `0` or absent → unbounded by the server; the device clamp below still applies. |
+| `max_idle_ms` | integer | no | Longest stretch with no flow on any granted meter. Flow resets it, so this — not `max_duration_ms` — is what keeps a slow glass alive. `0` or absent → no idle limit. |
 | `auth_device` / `token` | string | no | Echo of the presentment that triggered this grant. The device records them onto resulting `pour` events and uses them to release the grant on the matching detach. |
 
 Device semantics:
 
-- One active grant **per meter**. A new `authorize` naming an already-granted
-  meter replaces that meter's grant (new user, fresh expiry) — the person at
-  the tap is whoever presented most recently.
-- The device opens each granted meter's configured relay (typically driving
-  a solenoid valve) if it has one; meters without a relay simply gain
-  attribution.
-- **Safety backstop:** the device clamps `duration_ms` to its own
-  `max_grant_duration` (default **5 minutes**). A server asking for more
+- **The meter↔relay association stays on the server.** The device applies
+  the two sets verbatim — energize `relay_numbers`, cover `meter_numbers` —
+  and holds no mapping between them; nothing in grant behavior depends on
+  which relay serves which meter. (In `local` mode, where no server can
+  send the sets, they come from device config instead — see companion doc.)
+- One active grant **per meter**. A new grant covering an already-covered
+  meter takes that meter over — the person at the tap is whoever presented
+  most recently. The takeover is reported as `grant_end` with reason
+  `replaced` (§5.7).
+- **Updates.** An `authorize` (under a new command id) naming a live
+  grant's `grant_id` updates it in place: the sets and limits are replaced,
+  while poured volume and grant age carry over. This is how a server tops
+  up a volume budget or extends a session without ending the grant. Meters
+  leaving the scope are reported as `grant_end` with reason `replaced`. An
+  update cannot extend a grant past the device clamp (below); for more
+  time, issue a new grant.
+- A relay is energized while **any** active grant names it, and released
+  when the last such grant ends.
+- Pours on a granted meter carry the grant's `auth_device`/`auth_token`
+  echo and its `grant_id` (§5.1). A grant ending mid-pour ends the pour
+  first, so a pour is always tagged with the grant that actually poured
+  it. A grant *arriving* mid-pour adopts the in-flight pour, and a grant
+  *replacing* another mid-pour splits it — the full pour×grant corner-case
+  catalog is in the companion doc (§9).
+- **Limits end grants locally.** When any limit is reached the device
+  deauthorizes the grant itself — relays released, in-flight pour ended —
+  and reports a `grant_end` event (§5.7) naming which limit tripped.
+  Volume enforcement is best-effort at the margin: the valve closes the
+  moment the limit trips, but beer already in flight still registers, so
+  the final pour may slightly overshoot `max_volume_ml`.
+- A grant naming a meter or relay the device does not have is acknowledged
+  `error` and not applied, in whole.
+- **Safety backstop:** the device clamps every grant's total lifetime —
+  from creation, updates included — to its own `max_grant_duration`
+  (default **5 minutes**), whatever `max_duration_ms` says — including
+  "unlimited". A server asking for more
   gets the clamp, silently; the command is still acknowledged `ok`. A valve
   is a thing that pours beer on the floor when software misbehaves, so the
   final bound on "how long can it stay open" belongs to the device.
-- Applying the same command id twice is a no-op beyond refreshing expiry
-  (idempotent, since the server re-sends until acked).
+- Applying the same command id twice is a full no-op — limits, counters,
+  and timers are not reset (idempotent, since the server re-sends until
+  acked).
 - A device in `local` mode (see companion doc) acknowledges `authorize`
   with `result: "unsupported"`.
 
@@ -435,23 +527,28 @@ changes: existing grants on other meters are untouched.
 
 ### 7.3 `deauthorize`
 
-Revokes grants: closes the relays, ends any in-flight pour on the named
-meters (attributed to the user who poured it), clears the grants. This is
-the server-initiated cutoff — an admin button, a policy engine, an
-emergency stop. Detach and expiry do the same thing device-side without a
-command.
+Revokes grants by id: releases their relays, ends any in-flight pour on
+their meters (still tagged with the grant that poured it), clears them.
+This is the server-initiated cutoff — an admin button, a policy engine, an
+emergency stop. Detach and the grant's own limits do the same thing
+device-side without a command. Each grant ended this way is also reported
+as `grant_end` with reason `command` (§5.7).
 
 ```json
 {
   "id": "cmd_8f22",
   "type": "deauthorize",
-  "data": { "meter_numbers": [0, 2] }
+  "data": { "grant_ids": ["g_5501"] }
 }
 ```
 
 | Field | Type | Req | Description |
 |---|---|---|---|
-| `meter_numbers` | array of integer | no | Meters to revoke. **Absent means all meters.** |
+| `grant_ids` | array of string | no | Grants to revoke. **Absent means every active grant** — the emergency stop. |
+
+An id matching no active grant is ignored, and the command still
+acknowledges `ok`: the grant may simply have ended on its own before the
+command arrived, and the `grant_end` stream already tells the server how.
 
 ### 7.4 Reserved types
 
@@ -550,7 +647,9 @@ Content-Type: application/json
         "pour_id": "9b0e6a11-2f4c-49d3-8f6a-c1d2e3f40517",
         "volume_ml": 473.1,
         "duration_ms": 9800,
-        "user": "mikey",
+        "auth_device": "core.rfid",
+        "auth_token": "0089f2c4",
+        "grant_id": "g_5488",
         "ticks": 2557,
         "ml_per_tick": 0.185
       }
@@ -762,6 +861,22 @@ Normative, to ship in-repo as `schemas/kegboard-event.schema.json`.
               }
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "grant_end"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "data": {
+                "$ref": "#/$defs/grant_end"
+              }
+            }
+          }
         }
       ]
     },
@@ -791,14 +906,16 @@ Normative, to ship in-repo as `schemas/kegboard-event.schema.json`.
           "type": "integer",
           "minimum": 0
         },
-        "user": {
-          "type": "string"
-        },
         "auth_device": {
           "type": "string"
         },
         "auth_token": {
           "type": "string"
+        },
+        "grant_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
         },
         "ticks": {
           "type": "integer",
@@ -885,9 +1002,6 @@ Normative, to ship in-repo as `schemas/kegboard-event.schema.json`.
             "accepted",
             "denied"
           ]
-        },
-        "user": {
-          "type": "string"
         }
       }
     },
@@ -1007,6 +1121,54 @@ Normative, to ship in-repo as `schemas/kegboard-event.schema.json`.
           "type": "string"
         }
       }
+    },
+    "grant_end": {
+      "type": "object",
+      "required": [
+        "meter_numbers",
+        "reason",
+        "volume_ml",
+        "duration_ms"
+      ],
+      "properties": {
+        "meter_numbers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "reason": {
+          "enum": [
+            "max_volume",
+            "max_duration",
+            "max_idle",
+            "detach",
+            "command",
+            "replaced"
+          ]
+        },
+        "auth_device": {
+          "type": "string"
+        },
+        "auth_token": {
+          "type": "string"
+        },
+        "grant_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "volume_ml": {
+          "type": "number",
+          "minimum": 0
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
     }
   }
 }
@@ -1064,15 +1226,21 @@ Covers both the authenticated (200) and pairing (401) responses.
   "$defs": {
     "authorize": {
       "type": "object",
-      "required": ["meter_numbers", "duration_ms"],
+      "required": ["grant_id", "meter_numbers"],
       "properties": {
+        "grant_id": { "type": "string", "minLength": 1, "maxLength": 64 },
         "meter_numbers": {
           "type": "array",
           "minItems": 1,
           "items": { "type": "integer", "minimum": 0 }
         },
-        "user": { "type": "string" },
-        "duration_ms": { "type": "integer", "exclusiveMinimum": 0 },
+        "relay_numbers": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 }
+        },
+        "max_volume_ml": { "type": "number", "minimum": 0 },
+        "max_duration_ms": { "type": "integer", "minimum": 0 },
+        "max_idle_ms": { "type": "integer", "minimum": 0 },
         "auth_device": { "type": "string" },
         "token": { "type": "string" }
       }
@@ -1088,9 +1256,10 @@ Covers both the authenticated (200) and pairing (401) responses.
     "deauthorize": {
       "type": "object",
       "properties": {
-        "meter_numbers": {
+        "grant_ids": {
           "type": "array",
-          "items": { "type": "integer", "minimum": 0 }
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1, "maxLength": 64 }
         }
       }
     }

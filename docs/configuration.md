@@ -58,6 +58,7 @@ Speaks the [Kegboard Event Protocol](kegboard-event-protocol.md) to a server.
 |---|---|---|
 | `reporting_url` | required | Full URL, path included, e.g. `https://kegbot.example.com/api/kegboard-event`. No credential is configured — the device provisions its own bearer token by pairing via the server dashboard, and it persists in flash. |
 | `meters` | `[]` | Meters whose pours are reported. |
+| `relays` | `[]` | The device's numbered relays: `relay_number:` plus `relay:` (the relay to drive, e.g. from `packages/relays.yaml`). Reported in the `status` inventory, and the targets of server grants (and of `set_relay`, once that reserved command is specified). |
 | `thermo_sensors` | `[]` | `sensor:`/`name:` pairs; any ESPHome sensor works. |
 | `heartbeat_interval` | `60s` | Status event cadence; also bounds worst-case command latency. |
 | `pour_update_interval` | `1s` | Live `pour_update` cadence; `0s` disables. |
@@ -69,21 +70,21 @@ means events were lost and is worth alerting on.
 ## `kegboard_auth`
 
 Applies [authenticated pouring](authenticated-pouring.md): per-meter grants,
-decided by the server (or locally), driving valve toggles and pour
-attribution.
+decided by the server (or locally), driving valve relays and tagging pours
+for server-side attribution.
 
 | Option | Default | Notes |
 |---|---|---|
-| `mode` | `server` | `server`: every token presentment is decided by the server, which chooses the meters, user, and duration. `local`: every token pours as guest, serverlessly. |
-| `gates` | `[]` | `meter:` plus optional `toggle:` (valve relay). A gate without a toggle gets attribution only. |
+| `mode` | `server` | `server`: every token presentment is decided by the server, whose grants name the meters and relays they apply to and their limits (volume, total time, idle time) — the device holds no meter↔relay association and never learns user identity. `local`: every token pours as guest, serverlessly. |
+| `gates` | `[]` | **`local` mode only**: `meter:` plus optional `relay:`. A gate without a relay gets attribution only. In `server` mode each grant names its own meters and relays and this option is unused. |
 | `offline_policy` | `deny` | Token presented while the server is unreachable: `deny`, or `guest` (attribution only — never opens valves). |
 | `max_grant_duration` | `5min` | Device-side clamp on server-issued grants: the final bound on valve-open time. |
 | `local_grant_duration` | `30s` | Grant length in `local` mode and for offline-guest grants. |
 
 Actions: `kegboard_auth.token_attached` / `.token_detached` (`device`,
 `token`), `.revoke`. Condition: `.is_authorized`. Triggers: `on_authorized`
-(`user`), `on_denied` (`reason`), `on_revoked`. Optional entities:
-`authorized`, `user`.
+(`auth_device`, `token`), `on_denied` (`reason`), `on_revoked`. Optional
+entities: `authorized`.
 
 Readers feed it through the actions — see `examples/kegbot-full.yaml` for
 RFID and iButton wiring.
