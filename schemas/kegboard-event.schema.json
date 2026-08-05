@@ -162,6 +162,22 @@
               }
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "grant_end"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "data": {
+                "$ref": "#/$defs/grant_end"
+              }
+            }
+          }
         }
       ]
     },
@@ -191,14 +207,16 @@
           "type": "integer",
           "minimum": 0
         },
-        "user": {
-          "type": "string"
-        },
         "auth_device": {
           "type": "string"
         },
         "auth_token": {
           "type": "string"
+        },
+        "grant_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
         },
         "ticks": {
           "type": "integer",
@@ -285,9 +303,6 @@
             "accepted",
             "denied"
           ]
-        },
-        "user": {
-          "type": "string"
         }
       }
     },
@@ -405,6 +420,54 @@
         },
         "message": {
           "type": "string"
+        }
+      }
+    },
+    "grant_end": {
+      "type": "object",
+      "required": [
+        "meter_numbers",
+        "reason",
+        "volume_ml",
+        "duration_ms"
+      ],
+      "properties": {
+        "meter_numbers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "reason": {
+          "enum": [
+            "max_volume",
+            "max_duration",
+            "max_idle",
+            "detach",
+            "command",
+            "replaced"
+          ]
+        },
+        "auth_device": {
+          "type": "string"
+        },
+        "auth_token": {
+          "type": "string"
+        },
+        "grant_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "volume_ml": {
+          "type": "number",
+          "minimum": 0
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     }

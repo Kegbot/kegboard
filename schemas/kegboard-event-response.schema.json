@@ -114,10 +114,15 @@
     "authorize": {
       "type": "object",
       "required": [
-        "meter_numbers",
-        "duration_ms"
+        "grant_id",
+        "meter_numbers"
       ],
       "properties": {
+        "grant_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
         "meter_numbers": {
           "type": "array",
           "minItems": 1,
@@ -126,12 +131,24 @@
             "minimum": 0
           }
         },
-        "user": {
-          "type": "string"
+        "relay_numbers": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
         },
-        "duration_ms": {
+        "max_volume_ml": {
+          "type": "number",
+          "minimum": 0
+        },
+        "max_duration_ms": {
           "type": "integer",
-          "exclusiveMinimum": 0
+          "minimum": 0
+        },
+        "max_idle_ms": {
+          "type": "integer",
+          "minimum": 0
         },
         "auth_device": {
           "type": "string"
@@ -158,11 +175,13 @@
     "deauthorize": {
       "type": "object",
       "properties": {
-        "meter_numbers": {
+        "grant_ids": {
           "type": "array",
+          "minItems": 1,
           "items": {
-            "type": "integer",
-            "minimum": 0
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
           }
         }
       }

@@ -56,20 +56,23 @@ presentments, heartbeats, command results — and POSTs them as JSON to
 
 ## Authorization
 
-`kegboard_auth` holds no token database — only the currently active grants,
-one per meter. In `server` mode a token presentment is flushed to the server
+`kegboard_auth` holds no token database and no meter↔relay map — only the
+currently active grants, one per meter, each naming its own meters and
+relays from the server. In `server` mode a token presentment is flushed to the server
 immediately and the decision (`authorize`/`deny`) returns in the same HTTP
-round trip; grants expire after `duration_ms` (clamped to
-`max_grant_duration`, extended while a pour is running), on token detach, or
-on a server `deauthorize`. In `local` mode the device decides itself. Full
-semantics in [Authenticated Pouring](authenticated-pouring.md).
+round trip; grants end at their server-set limits — volume poured, total
+time, idle time — with total time always clamped to `max_grant_duration`,
+on token detach, or on a server `deauthorize`. Every ending is reported
+upstream as a `grant_end` event naming the reason. In `local` mode the
+device decides itself. Full semantics in
+[Authenticated Pouring](authenticated-pouring.md).
 
 ## Relays
 
 A relay left on is usually a valve held open. Each relay in
 `packages/relays.yaml` starts a watchdog timer when switched on and switches
 itself off after `relay_watchdog_timeout` unless re-triggered; re-issuing the
-on command restarts the timer. `kegboard_auth` toggles are additionally
+on command restarts the timer. Grant-driven relays are additionally
 bounded by the grant clamp — two independent limits between software and
 beer on the floor.
 
