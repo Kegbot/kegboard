@@ -8,6 +8,8 @@ genuinely kegboard-specific rather than ESPHome-specific.
 - `json_writer.h` / `.cpp` — minimal JSON serializer
 - `events.h` / `.cpp` — event protocol payloads and batch envelope
 - `grant_table.h` / `.cpp` — per-meter authorization grants
+- `auth_engine.h` / `.cpp` — grant semantics composed with the device: validation, limits, relays, attribution, endings
+- `delivery.h` / `.cpp` — send scheduling: backoff, status handling, pairing cadence, command dedup
 - `ring_queue.h` — bounded FIFO for offline event buffering
 
 Core code lives in the global `kbcore` namespace, deliberately *not* in

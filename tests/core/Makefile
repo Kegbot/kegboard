@@ -32,7 +32,9 @@ CORE_SRCS := \
 	$(CORE_DIR)/tick_series.cpp \
 	$(CORE_DIR)/json_writer.cpp \
 	$(CORE_DIR)/events.cpp \
-	$(CORE_DIR)/grant_table.cpp
+	$(CORE_DIR)/grant_table.cpp \
+	$(CORE_DIR)/delivery.cpp \
+	$(CORE_DIR)/auth_engine.cpp
 
 CORE_HDRS := \
 	$(CORE_DIR)/pour_session.h \
@@ -40,7 +42,9 @@ CORE_HDRS := \
 	$(CORE_DIR)/ring_queue.h \
 	$(CORE_DIR)/json_writer.h \
 	$(CORE_DIR)/events.h \
-	$(CORE_DIR)/grant_table.h
+	$(CORE_DIR)/grant_table.h \
+	$(CORE_DIR)/delivery.h \
+	$(CORE_DIR)/auth_engine.h
 
 TESTS := \
 	test_pour_session \
@@ -48,7 +52,9 @@ TESTS := \
 	test_ring_queue \
 	test_json_writer \
 	test_events \
-	test_grant_table
+	test_grant_table \
+	test_delivery \
+	test_auth_engine
 
 BINARIES := $(addprefix $(BUILD_DIR)/,$(TESTS))
 
