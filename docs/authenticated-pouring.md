@@ -42,37 +42,37 @@ defines who decides what, and how the two sides stay simple.
 - A grant ends when a limit is hit, its token detaches, the server revokes
   it, or a newer grant takes its meters. Every ending is reported as a
   `grant_end` event with its reason.
-- No server, or server unreachable? The device can decide by itself, per
-  its configured mode (§3) and offline policy (§6).
+- Server unreachable? A configured offline policy (§6) decides whether the
+  user is signaled a refusal — either way, nothing opens, and the queued
+  `token` event preserves the audit trail.
 
 The rest of this doc unpacks each of these.
 
 ## 3. Authorization modes
 
-A device operates in exactly one mode per auth gate, chosen in device
-configuration:
+An install is either authenticated or open:
 
 | Mode | Who decides | Needs server online? | Use case |
 |---|---|---|---|
-| `server` | Server, per token presentment | Yes (with a configurable offline fallback) | The default with a server configured. Scales to any token database; policy lives in one place. |
-| `local` | Device, from its own config | No | Serverless installs; every token pours as guest. |
-| `open` | Nobody — no gating | No | Meters-only installs, no valves. Pours are guest-attributed unless a token event happens to resolve. Not a config value: `open` is simply the absence of an auth component (or a meter outside every gate). |
+| authenticated (`kegboard_auth` configured) | Server, per token presentment | Yes (with a configurable offline fallback) | Gated or attributed taps. Scales to any token database; policy lives in one place. |
+| `open` (no auth component) | Nobody — no gating | No | Meters-only installs, no valves. Every pour is a guest pour. |
 
-The device is **stateless about policy in `server` mode**: it holds no
-token database and no meter↔relay map — only the currently active
-grant(s), each of which arrives naming the meters it covers and the
-relays it opens (see main doc §7.1). The meter↔relay association is
-backend configuration, owned in exactly one place: the server composes
-each grant's sets from it, and the device applies them verbatim. Only
-`local` mode, where no server can send them, wires that association into
-device config.
+Authorization always means the server decides. A serverless install that
+wants token-driven valves can wire the reader triggers to relay switches
+with plain ESPHome automations — outside this protocol entirely.
 
-## 4. `server` mode: the core flow
+The device is **stateless about policy**: it holds no token database and
+no meter↔relay map — only the currently active grant(s), each of which
+arrives naming the meters it covers and the relays it opens (see main doc
+§7.1). The meter↔relay association is backend configuration, owned in
+exactly one place: the server composes each grant's sets from it, and the
+device applies them verbatim.
+
+## 4. The core flow
 
 1. **Token presented.** The reader reports a token; the device emits a
-   `token` event with `action: "attached"` and **no `status` field** — the
-   absent status is the signal that the device is asking the server to
-   decide. The device flushes the batch immediately.
+   `token` event with `action: "attached"` — always a question for the
+   server. The device flushes the batch immediately.
 2. **Server decides.** The server looks up the token, applies whatever
    policy it likes (user standing, keg access, time of day), and responds —
    in the same HTTP response — with an `authorize` or a `deny` command.
@@ -105,7 +105,7 @@ reader              device                                server
   |                   |                                     |
   | token 0089f2c4    |                                     |
   |------------------>| POST /kegboard-event                |
-  |                   |   [token attached, no status] ----->|
+  |                   |   [token attached] ---------------->|
   |                   |                                     | lookup, policy
   |                   |        200 {commands:[authorize]}   |
   |                   |<------------------------------------|
@@ -145,33 +145,14 @@ suggested 5 s):
 
 | `offline_policy` | Behavior |
 |---|---|
-| `deny` (default) | Tap stays closed. Correct for installs where gating is the point. |
-| `guest` | **No valves open.** The device records an attribution-only grant covering every meter **no active grant already covers** (§9, case 6) — a failed offline presentment must never disturb a live, authorized pour. Pours carry the presentment's token echo (no `grant_id`, since no command granted them), and the queued `token` event reaches the server later, preserving the audit trail. Opening valves offline may be revisited later; for now an offline server never results in an opened valve. |
+| `deny` (default) | Tap stays closed; the device signals refusal. Correct for installs where gating is the point. |
+| `guest` | **Nothing opens and nothing is granted** — the only difference from `deny` is that the user is not signaled a refusal. Pours proceed as ordinary guest pours (a meter without a valve meters regardless), and the queued `token` event reaches the server later, preserving the audit trail. Opening valves offline may be revisited later; for now an offline server never results in an opened valve. |
 
 Note what is deliberately absent: a device-side token cache. Caching
 assignments would reintroduce the state this design removes and creates
-stale-revocation problems. If an install needs offline attribution, that is
-`local` mode.
+stale-revocation problems.
 
-## 7. `local` mode
-
-For serverless installs, or installs that prefer the tap to work identically
-with the network down. The device decides by itself: every token is
-accepted, as guest. (A device-side allow-list may come later; for now,
-restricting *who* pours requires a server.)
-
-This is the one place the meter↔relay association lives on the device:
-with no server to send grants, the device's own gate config (meter plus
-optional relay) says which valve a locally accepted token opens. Pours
-still carry the accepted token's echo, so a server can attribute them
-after the fact from its own token database.
-
-`token` events are still emitted (with `status` set, since the device
-decided) whenever a server is configured, so the server keeps an audit trail
-and can drive "assign this recently seen token" flows. `authorize` commands
-received in `local` mode are acknowledged with `result: "unsupported"`.
-
-## 8. Multi-meter, multi-user
+## 7. Multi-meter, multi-user
 
 Grants are per meter, so a two-tap device can simultaneously have Alice on
 meter 0 and Bob on meter 1:
@@ -194,7 +175,7 @@ shared reader can grant all meters, or apply fancier policy (the user's
 reserved tap, the tap with their keg on it). The protocol only carries the
 outcome: each grant's `meter_numbers` and `relay_numbers`.
 
-## 9. Grant and pour corner cases
+## 8. Grant and pour corner cases
 
 Every way a pour and a grant can interact, and the rule for each. Two
 principles cover them all:
@@ -204,7 +185,7 @@ principles cover them all:
   covering its meter at that moment, in full. The server resolves the user
   from `grant_id` — pinned to its own authorization decision, so a
   late-delivered pour attributes correctly even if the token was reassigned
-  in the meantime — or from the token echo for locally decided grants.
+  in the meantime.
 - **Limit accounting is decided as flow is observed.** Flow counts toward
   the grant covering the meter at the moment it flows — toward its
   `max_volume_ml`, and resetting its `max_idle_ms` — and is never
@@ -240,7 +221,3 @@ handful of corner cases do slightly surprising things.
    `grant_end` (main doc §5.7). Flow that continues — after the valve
    closes, or on a meter that never had one — is case 1 again: a new,
    unauthenticated guest pour.
-6. **Offline-guest grants never disturb live grants** (§6): they cover
-   only the meters no active grant already covers. If every meter is
-   covered, the presentment creates no grant at all; the queued `token`
-   event still preserves the audit trail.

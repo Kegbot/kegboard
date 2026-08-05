@@ -297,12 +297,6 @@
             "attached",
             "detached"
           ]
-        },
-        "status": {
-          "enum": [
-            "accepted",
-            "denied"
-          ]
         }
       }
     },
@@ -428,6 +422,7 @@
       "required": [
         "meter_numbers",
         "reason",
+        "grant_id",
         "volume_ml",
         "duration_ms"
       ],

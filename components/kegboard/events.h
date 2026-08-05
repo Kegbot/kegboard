@@ -49,8 +49,8 @@ struct PourData {
   uint32_t duration_ms{0};
   std::string auth_device;
   std::string auth_token;
-  /// Server-assigned id of the covering grant; empty for locally decided
-  /// and ungated pours (protocol §5.1).
+  /// Server-assigned id of the covering grant; empty for ungated (guest)
+  /// pours (protocol §5.1).
   std::string grant_id;
   /// UINT32_MAX omits `ticks`.
   uint32_t ticks{UINT32_MAX};
@@ -65,12 +65,7 @@ std::string pour_update_data_json(uint8_t meter, const std::string &pour_id, flo
 
 std::string temperature_data_json(const std::string &sensor, float temp_c);
 
-/// `status`: pass TOKEN_STATUS_NONE when the server should decide (protocol
-/// leaves the field absent), otherwise accepted/denied for local decisions.
-enum class TokenStatus : uint8_t { NONE, ACCEPTED, DENIED };
-
-std::string token_data_json(const std::string &auth_device, const std::string &token, bool attached,
-                            TokenStatus status);
+std::string token_data_json(const std::string &auth_device, const std::string &token, bool attached);
 
 struct StatusMeter {
   uint8_t meter{0};
@@ -99,8 +94,7 @@ std::string status_data_json(const StatusData &d);
 
 std::string command_result_data_json(const std::string &command, const char *result, const std::string &message);
 
-/// `grant_end` (protocol §5.7), straight from a GrantTable ending. An empty
-/// grant_id (local grants) omits the field.
+/// `grant_end` (protocol §5.7), straight from a GrantTable ending.
 std::string grant_end_data_json(const GrantEnd &end);
 
 // --- Batch serialization ---------------------------------------------------

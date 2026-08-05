@@ -19,19 +19,7 @@ void KegboardAuth::setup() {
     this->reporter_->set_command_handler([this](const std::string &type, JsonObjectConst data, std::string &message) {
       return this->handle_command_(type, data, message);
     });
-  }
-
-  // The device's meter inventory: gates plus the reporter's meters. Grants
-  // are validated against it, and every meter feeds flow accounting.
-  for (auto &gate : this->gates_) {
-    if (std::find(this->meters_.begin(), this->meters_.end(), gate.meter) == this->meters_.end())
-      this->meters_.push_back(gate.meter);
-  }
-  if (this->reporter_ != nullptr) {
-    for (auto *meter : this->reporter_->meter_list()) {
-      if (std::find(this->meters_.begin(), this->meters_.end(), meter) == this->meters_.end())
-        this->meters_.push_back(meter);
-    }
+    this->meters_ = this->reporter_->meter_list();
   }
 
   // True up flow accounting at pour end: loop() feeds deltas while the pour
@@ -64,33 +52,9 @@ kegboard_meter::KegboardMeter *KegboardAuth::meter_by_number_(uint8_t meter) {
   return nullptr;
 }
 
-KegboardAuth::Gate *KegboardAuth::gate_for_(uint8_t meter) {
-  for (auto &gate : this->gates_) {
-    if (gate.meter->meter_number() == meter)
-      return &gate;
-  }
-  return nullptr;
-}
-
-std::vector<uint8_t> KegboardAuth::all_gate_meters_() const {
-  std::vector<uint8_t> meters;
-  meters.reserve(this->gates_.size());
-  for (const auto &gate : this->gates_)
-    meters.push_back(gate.meter->meter_number());
-  return meters;
-}
-
-std::vector<uint8_t> KegboardAuth::all_known_meters_() const {
-  std::vector<uint8_t> meters;
-  meters.reserve(this->meters_.size());
-  for (const auto *meter : this->meters_)
-    meters.push_back(meter->meter_number());
-  return meters;
-}
-
 void KegboardAuth::adopt_in_flight_pour_(kegboard_meter::KegboardMeter *meter) {
   // POLICY — a grant arriving mid-pour ADOPTS the pour (authenticated-pouring
-  // §9, case 2): the pour keeps running and, at its end, is attributed to
+  // §8, case 2): the pour keeps running and, at its end, is attributed to
   // the grant in full — the forgot-to-authenticate-first case. Limit
   // accounting is not retroactive: the baseline below excludes the volume
   // already poured. To change the policy to "split into a new pour"
@@ -99,58 +63,14 @@ void KegboardAuth::adopt_in_flight_pour_(kegboard_meter::KegboardMeter *meter) {
     this->pour_seen_ml_[meter->meter_number()] = meter->session_volume_ml();
 }
 
-void KegboardAuth::apply_local_grant_(const std::vector<uint8_t> &meters, const std::string &auth_device,
-                                      const std::string &token, bool open_gate_relays) {
-  if (meters.empty())
-    return;
-
-  kbcore::GrantSpec spec;
-  // Internal id: unique per grant so a re-presented token gets a fresh grant
-  // (fresh limits), not an update. Never reported: `local` omits grant_id
-  // from pour and grant_end events.
-  spec.grant_id = "local-" + std::to_string(++this->local_grant_counter_);
-  spec.local = true;
-  spec.meters = meters;
-  spec.auth_device = auth_device;
-  spec.token = token;
-  spec.max_duration_ms = this->local_grant_duration_ms_;
-
-  this->process_ends_(this->grants_.authorize(spec, millis()));
-
-  for (uint8_t m : meters) {
-    auto *meter = this->meter_by_number_(m);
-    if (meter != nullptr) {
-      meter->set_active_auth("", auth_device, token);
-      this->adopt_in_flight_pour_(meter);
-    }
-    if (open_gate_relays) {
-      Gate *gate = this->gate_for_(m);
-      if (gate != nullptr && gate->relay != nullptr)
-        gate->relay->turn_on();
-    }
-  }
-}
-
 void KegboardAuth::token_attached(const std::string &auth_device, const std::string &token) {
   if (token.empty())
     return;
 
-  if (this->mode_ == AuthMode::LOCAL) {
-    // Serverless: every token pours as guest on every gate.
-    this->apply_local_grant_(this->all_gate_meters_(), auth_device, token, true);
-    ESP_LOGI(TAG, "Local grant for %s/%s", auth_device.c_str(), token.c_str());
-    for (auto *trigger : this->authorized_triggers_)
-      trigger->trigger(auth_device, token);
-    if (this->reporter_ != nullptr)
-      this->reporter_->queue_token_event(auth_device, token, true, kbcore::TokenStatus::ACCEPTED);
-    this->publish_state_();
-    return;
-  }
-
-  // Server mode: the decision rides the response to the token event. The
-  // command handler runs inside send_token_ask() and sets decision_received_.
+  // The decision rides the response to the token event. The command handler
+  // runs inside send_token_ask() and sets decision_received_.
   if (this->reporter_ == nullptr) {
-    ESP_LOGW(TAG, "Server mode with no reporter; denying");
+    ESP_LOGW(TAG, "No reporter; denying");
     this->fire_denied_("no reporter configured");
     return;
   }
@@ -160,20 +80,11 @@ void KegboardAuth::token_attached(const std::string &auth_device, const std::str
 
   if (!delivered) {
     if (this->offline_policy_ == OfflinePolicy::GUEST) {
-      // Attribution-only, over every meter no active grant already covers:
-      // an offline server never results in an opened valve, and a failed
-      // presentment never disturbs a live grant (authenticated-pouring §6,
-      // §9 case 6).
-      std::vector<uint8_t> uncovered;
-      for (uint8_t m : this->all_known_meters_()) {
-        if (this->grants_.grant_for(m) == nullptr)
-          uncovered.push_back(m);
-      }
-      ESP_LOGW(TAG, "Server unreachable; guest grant (no valves) for %s/%s", auth_device.c_str(), token.c_str());
-      this->apply_local_grant_(uncovered, auth_device, token, false);
-      for (auto *trigger : this->authorized_triggers_)
-        trigger->trigger(auth_device, token);
-      this->publish_state_();
+      // Nothing opens and nothing is granted: pours proceed as ordinary
+      // guest pours, and the queued token event preserves the audit trail
+      // (authenticated-pouring §6). The only difference from `deny` is
+      // that the user is not signaled a refusal.
+      ESP_LOGW(TAG, "Server unreachable; %s/%s pours as guest", auth_device.c_str(), token.c_str());
     } else {
       ESP_LOGW(TAG, "Server unreachable; denying %s/%s", auth_device.c_str(), token.c_str());
       this->fire_denied_("server unreachable");
@@ -192,13 +103,8 @@ kegboard_reporter::CommandOutcome KegboardAuth::handle_command_(const std::strin
                                                                 std::string &message) {
   using kegboard_reporter::CommandOutcome;
 
-  if (type == "authorize") {
-    if (this->mode_ == AuthMode::LOCAL) {
-      // The device decides in local mode (authenticated-pouring §7).
-      return CommandOutcome::UNSUPPORTED;
-    }
+  if (type == "authorize")
     return this->handle_authorize_(data, message);
-  }
 
   if (type == "deny") {
     this->decision_received_ = true;
@@ -353,7 +259,7 @@ void KegboardAuth::token_detached(const std::string &auth_device, const std::str
     return;
   const auto ends = this->grants_.detach(auth_device, token, millis());
   if (this->reporter_ != nullptr)
-    this->reporter_->queue_token_event(auth_device, token, false, kbcore::TokenStatus::NONE);
+    this->reporter_->queue_token_event(auth_device, token, false);
   if (ends.empty())
     return;
   ESP_LOGI(TAG, "Token removed; ending %u grant(s)", static_cast<unsigned>(ends.size()));
@@ -381,15 +287,6 @@ void KegboardAuth::process_ends_(const std::vector<kbcore::GrantEnd> &ends) {
         meter->end_pour();
         meter->clear_active_auth();
       }
-      // Gate relays belong to local mode alone; in server mode they are
-      // never touched — grants name their relays explicitly (handled
-      // below), and a gate wired in a server-mode config may be driven by
-      // something else entirely.
-      if (this->mode_ == AuthMode::LOCAL) {
-        Gate *gate = this->gate_for_(m);
-        if (gate != nullptr && gate->relay != nullptr)
-          gate->relay->turn_off();
-      }
     }
     for (uint8_t relay : end.relays) {
       // A relay stays energized while any other active grant names it.
@@ -399,8 +296,8 @@ void KegboardAuth::process_ends_(const std::vector<kbcore::GrantEnd> &ends) {
       if (sw != nullptr)
         sw->turn_off();
     }
-    ESP_LOGI(TAG, "Grant %s ended (%s): %u meter(s)", end.grant_id.empty() ? "(local)" : end.grant_id.c_str(),
-             kbcore::grant_end_reason_str(end.reason), static_cast<unsigned>(end.meters.size()));
+    ESP_LOGI(TAG, "Grant %s ended (%s): %u meter(s)", end.grant_id.c_str(), kbcore::grant_end_reason_str(end.reason),
+             static_cast<unsigned>(end.meters.size()));
     if (this->reporter_ != nullptr)
       this->reporter_->queue_grant_end(end);
     for (auto *trigger : this->revoked_triggers_)
@@ -459,13 +356,8 @@ void KegboardAuth::publish_state_() {
 
 void KegboardAuth::dump_config() {
   ESP_LOGCONFIG(TAG, "Kegboard Auth:");
-  ESP_LOGCONFIG(TAG, "  Mode: %s", this->mode_ == AuthMode::SERVER ? "server" : "local");
-  if (this->mode_ == AuthMode::SERVER) {
-    ESP_LOGCONFIG(TAG, "  Offline policy: %s",
-                  this->offline_policy_ == OfflinePolicy::DENY ? "deny" : "guest (no valves)");
-  }
+  ESP_LOGCONFIG(TAG, "  Offline policy: %s", this->offline_policy_ == OfflinePolicy::DENY ? "deny" : "guest");
   ESP_LOGCONFIG(TAG, "  Max grant duration: %" PRIu32 " s", this->grants_.max_duration_ms() / 1000);
-  ESP_LOGCONFIG(TAG, "  Gates (local mode): %u", static_cast<unsigned>(this->gates_.size()));
   ESP_LOGCONFIG(TAG, "  Meters: %u", static_cast<unsigned>(this->meters_.size()));
 }
 

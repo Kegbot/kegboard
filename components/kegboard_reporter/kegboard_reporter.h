@@ -78,9 +78,9 @@ class KegboardReporter : public Component {
   /// offline policy).
   bool send_token_ask(const std::string &auth_device, const std::string &token);
 
-  /// Emit a token event recording a local decision or a detach.
-  void queue_token_event(const std::string &auth_device, const std::string &token, bool attached,
-                         kbcore::TokenStatus status);
+  /// Emit a token event (used by auth for detach; attach rides
+  /// send_token_ask).
+  void queue_token_event(const std::string &auth_device, const std::string &token, bool attached);
 
   /// Emit a grant_end event (protocol §5.7). Queued normally: it does not
   /// reset backoff, and when delivery is healthy it goes out on the next

@@ -35,8 +35,7 @@ uint32_t GrantTable::effective_max_duration_(uint32_t requested_ms) const {
 GrantEnd GrantTable::make_end_(const Grant &grant, std::vector<uint8_t> meters, GrantEndReason reason,
                                uint32_t now_ms) const {
   GrantEnd end;
-  if (!grant.spec.local)
-    end.grant_id = grant.spec.grant_id;
+  end.grant_id = grant.spec.grant_id;
   end.auth_device = grant.spec.auth_device;
   end.token = grant.spec.token;
   end.meters = std::move(meters);

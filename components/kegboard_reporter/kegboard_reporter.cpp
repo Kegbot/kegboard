@@ -161,16 +161,14 @@ void KegboardReporter::add_thermo_sensor(sensor::Sensor *sensor, const std::stri
 }
 
 bool KegboardReporter::send_token_ask(const std::string &auth_device, const std::string &token) {
-  this->enqueue_(
-      this->make_event_("token", kbcore::token_data_json(auth_device, token, true, kbcore::TokenStatus::NONE)));
+  this->enqueue_(this->make_event_("token", kbcore::token_data_json(auth_device, token, true)));
   // The authorization decision rides the response to this send; commands are
   // dispatched inside send_batch_() before it returns.
   return this->send_batch_({});
 }
 
-void KegboardReporter::queue_token_event(const std::string &auth_device, const std::string &token, bool attached,
-                                         kbcore::TokenStatus status) {
-  this->enqueue_(this->make_event_("token", kbcore::token_data_json(auth_device, token, attached, status)));
+void KegboardReporter::queue_token_event(const std::string &auth_device, const std::string &token, bool attached) {
+  this->enqueue_(this->make_event_("token", kbcore::token_data_json(auth_device, token, attached)));
 }
 
 void KegboardReporter::queue_grant_end(const kbcore::GrantEnd &end) {

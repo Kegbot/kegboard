@@ -65,12 +65,12 @@ TEST(pour_data_zero_ticks_is_still_emitted) {
   CHECK(pour_data_json(d).find("\"ticks\":0") != std::string::npos);
 }
 
-TEST(token_data_status_absent_means_server_decides) {
-  const std::string ask = token_data_json("core.rfid", "0089f2c4", true, TokenStatus::NONE);
-  CHECK_EQ(ask.find("\"status\""), std::string::npos);
+TEST(token_data_attach_and_detach) {
+  const std::string ask = token_data_json("core.rfid", "0089f2c4", true);
+  CHECK(ask.find("\"action\":\"attached\"") != std::string::npos);
 
-  const std::string local = token_data_json("core.rfid", "0089f2c4", true, TokenStatus::ACCEPTED);
-  CHECK(local.find("\"status\":\"accepted\"") != std::string::npos);
+  const std::string gone = token_data_json("onewire", "0000000012345678", false);
+  CHECK(gone.find("\"action\":\"detached\"") != std::string::npos);
 }
 
 TEST(status_data_includes_config_always) {
@@ -107,7 +107,7 @@ TEST(status_data_relays_inventory) {
   CHECK(json.find("\"relays\":[{\"relay_number\":0},{\"relay_number\":1}]") != std::string::npos);
 }
 
-TEST(grant_end_data_omits_empty_grant_id) {
+TEST(grant_end_data_carries_the_grant) {
   GrantEnd end;
   end.meters = {0, 2};
   end.reason = GrantEndReason::MAX_VOLUME;
@@ -124,10 +124,6 @@ TEST(grant_end_data_omits_empty_grant_id) {
   CHECK(json.find("\"auth_token\":\"0089f2c4\"") != std::string::npos);
   CHECK(json.find("\"volume_ml\":2004.900") != std::string::npos);
   CHECK(json.find("\"duration_ms\":84200") != std::string::npos);
-
-  // Local grants report no grant_id at all.
-  end.grant_id.clear();
-  CHECK_EQ(grant_end_data_json(end).find("\"grant_id\""), std::string::npos);
 }
 
 TEST(batch_age_is_computed_from_send_time) {
@@ -237,21 +233,18 @@ static int emit_samples(const char *dir) {
     Event event;
   };
   Sample samples[] = {
-      {"pour-full", {}},   {"pour-minimal", {}},   {"pour-update", {}}, {"temperature", {}},    {"token-ask", {}},
-      {"token-local", {}}, {"token-detached", {}}, {"status", {}},      {"command-result", {}}, {"grant-end", {}},
+      {"pour-full", {}},      {"pour-minimal", {}}, {"pour-update", {}},    {"temperature", {}}, {"token-ask", {}},
+      {"token-detached", {}}, {"status", {}},       {"command-result", {}}, {"grant-end", {}},
   };
   samples[0].event = Event{17, "pour", 1000, "2026-08-03T18:02:11Z", pour_data_json(full)};
   samples[1].event = Event{18, "pour", 1500, "", pour_data_json(minimal)};
   samples[2].event = Event{19, "pour_update", 2000, "", pour_update_data_json(0, full.pour_id, 120.4f, 2400)};
   samples[3].event = Event{20, "temperature", 2500, "", temperature_data_json("thermo-28ff641d8fbb0517", 4.25f)};
-  samples[4].event = Event{21, "token", 3000, "", token_data_json("core.rfid", "0089f2c4", true, TokenStatus::NONE)};
-  samples[5].event =
-      Event{22, "token", 3100, "", token_data_json("onewire", "0000000012345678", true, TokenStatus::ACCEPTED)};
-  samples[6].event =
-      Event{23, "token", 3200, "", token_data_json("onewire", "0000000012345678", false, TokenStatus::NONE)};
-  samples[7].event = Event{24, "status", 3300, "", status_data_json(st)};
-  samples[8].event = Event{25, "command_result", 3400, "", command_result_data_json("cmd_8f21", "ok", "")};
-  samples[9].event = Event{26, "grant_end", 3500, "", grant_end_data_json(end)};
+  samples[4].event = Event{21, "token", 3000, "", token_data_json("core.rfid", "0089f2c4", true)};
+  samples[5].event = Event{22, "token", 3200, "", token_data_json("onewire", "0000000012345678", false)};
+  samples[6].event = Event{23, "status", 3300, "", status_data_json(st)};
+  samples[7].event = Event{24, "command_result", 3400, "", command_result_data_json("cmd_8f21", "ok", "")};
+  samples[8].event = Event{25, "grant_end", 3500, "", grant_end_data_json(end)};
 
   // One batch per sample, plus one combined batch exercising multiple events.
   std::vector<const Event *> all;
@@ -288,10 +281,10 @@ int main(int argc, char **argv) {
   RUN(pour_data_minimal_has_only_required_fields);
   RUN(pour_data_full_includes_optionals);
   RUN(pour_data_zero_ticks_is_still_emitted);
-  RUN(token_data_status_absent_means_server_decides);
+  RUN(token_data_attach_and_detach);
   RUN(status_data_includes_config_always);
   RUN(status_data_relays_inventory);
-  RUN(grant_end_data_omits_empty_grant_id);
+  RUN(grant_end_data_carries_the_grant);
   RUN(batch_age_is_computed_from_send_time);
   RUN(batch_age_survives_millis_rollover);
   RUN(batch_omits_time_when_clock_never_synced);

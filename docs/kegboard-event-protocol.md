@@ -174,7 +174,7 @@ event is created the moment the pour finishes, so
 | `duration_ms` | integer | yes | First tick to last tick. |
 | `auth_device` | string | no | Reader that authorized the pour (`core.rfid`, `onewire`, ...). |
 | `auth_token` | string | no | Token that authorized the pour. |
-| `grant_id` | string | no | The server-assigned id of the grant that covered this pour (§7.1). Absent for locally decided and ungated pours. |
+| `grant_id` | string | no | The server-assigned id of the grant that covered this pour (§7.1). Absent for ungated (guest) pours. |
 | `ticks` | integer | no | Raw tick count. Advisory diagnostic only; servers MUST NOT compute volume from it. |
 | `ml_per_tick` | number | no | Calibration in effect when the pour ended. Diagnostic; lets a server sanity-check `ticks * ml_per_tick ≈ volume_ml`. |
 | `tick_series` | string | no | Space-separated `<offset_ms>:<ticks>` pairs. Diagnostic. |
@@ -182,8 +182,8 @@ event is created the moment the pour finishes, so
 There is no user field: **the device never learns identity**. The server
 attributes a pour from `grant_id` — which pins it to the server's own
 authorization decision, and so stays correct even if the token is reassigned
-between the pour and a late queued delivery — or, for locally decided
-grants, from `auth_token`. A pour carrying none of these is a guest pour.
+between the pour and a late queued delivery. A pour without one is a guest
+pour.
 
 ### 5.2 `pour_update`
 
@@ -241,8 +241,7 @@ An auth token arrived or left. Central to server-side authorization; see the
 {
   "auth_device": "onewire",
   "token": "0000000012345678",
-  "action": "attached",
-  "status": "accepted"
+  "action": "attached"
 }
 ```
 
@@ -251,7 +250,10 @@ An auth token arrived or left. Central to server-side authorization; see the
 | `auth_device` | string | yes | Reader name (`core.rfid`, `onewire`, ...). |
 | `token` | string | yes | Token value, lowercase hex by convention. |
 | `action` | string | yes | `attached` or `detached`. |
-| `status` | string | no | On `attached`: `accepted` or `denied` — present only when the device decided locally. Absent means the device is asking the server to decide (see companion doc). |
+
+An `attached` event is always a question: the server decides, and its
+answer — an `authorize` or `deny` command — rides the same response (see
+companion doc).
 
 The device SHOULD flush a batch immediately when a token is attached, since
 authorization latency is the user standing at the tap waiting.
@@ -324,9 +326,8 @@ at-least-once/idempotent semantics as the event channel.
 
 Reports that an authorization grant (§7.1) ended, and why. Emitted once per
 ending — including partial endings, where only some of a grant's meters are
-released — for every grant, server-issued or local, so the server gets the
-complete grant lifecycle from this one event type instead of inferring it
-from timers of its own.
+released — so the server gets the complete grant lifecycle from this one
+event type instead of inferring it from timers of its own.
 
 ```json
 {
@@ -345,7 +346,7 @@ from timers of its own.
 | `meter_numbers` | array of integer | yes | The meters released by this ending. |
 | `reason` | string | yes | Why the grant ended; see below. |
 | `auth_device` / `auth_token` | string | no | Echo of the presentment that created the grant, as on `pour` (§5.1). |
-| `grant_id` | string | no | The server-assigned id of the grant (§7.1). Absent for locally decided grants. |
+| `grant_id` | string | yes | The server-assigned id of the grant (§7.1). |
 | `volume_ml` | number | yes | Total volume poured under the grant, across all its meters — a snapshot at this ending, see below. |
 | `duration_ms` | integer | yes | Grant age at this ending. |
 
@@ -415,8 +416,8 @@ the same round trip as the token event (see companion doc). A future
 transport (WebSocket/MQTT) can push the same command objects unchanged.
 
 The complete command catalog follows. How these commands compose with token
-presentment into an authorization flow — including the `server`/`local`/`open`
-modes and offline behavior — is specified in
+presentment into an authorization flow — including offline behavior — is
+specified in
 [Authenticated Pouring](authenticated-pouring.md).
 
 ### 7.1 `authorize`
@@ -460,8 +461,7 @@ Device semantics:
 - **The meter↔relay association stays on the server.** The device applies
   the two sets verbatim — energize `relay_numbers`, cover `meter_numbers` —
   and holds no mapping between them; nothing in grant behavior depends on
-  which relay serves which meter. (In `local` mode, where no server can
-  send the sets, they come from device config instead — see companion doc.)
+  which relay serves which meter.
 - One active grant **per meter**. A new grant covering an already-covered
   meter takes that meter over — the person at the tap is whoever presented
   most recently. The takeover is reported as `grant_end` with reason
@@ -480,7 +480,7 @@ Device semantics:
   first, so a pour is always tagged with the grant that actually poured
   it. A grant *arriving* mid-pour adopts the in-flight pour, and a grant
   *replacing* another mid-pour splits it — the full pour×grant corner-case
-  catalog is in the companion doc (§9).
+  catalog is in the companion doc (§8).
 - **Limits end grants locally.** When any limit is reached the device
   deauthorizes the grant itself — relays released, in-flight pour ended —
   and reports a `grant_end` event (§5.7) naming which limit tripped.
@@ -499,8 +499,6 @@ Device semantics:
 - Applying the same command id twice is a full no-op — limits, counters,
   and timers are not reset (idempotent, since the server re-sends until
   acked).
-- A device in `local` mode (see companion doc) acknowledges `authorize`
-  with `result: "unsupported"`.
 
 ### 7.2 `deny`
 
@@ -996,12 +994,6 @@ Normative, to ship in-repo as `schemas/kegboard-event.schema.json`.
             "attached",
             "detached"
           ]
-        },
-        "status": {
-          "enum": [
-            "accepted",
-            "denied"
-          ]
         }
       }
     },
@@ -1127,6 +1119,7 @@ Normative, to ship in-repo as `schemas/kegboard-event.schema.json`.
       "required": [
         "meter_numbers",
         "reason",
+        "grant_id",
         "volume_ml",
         "duration_ms"
       ],
