@@ -9,7 +9,7 @@ namespace kbcore {
 std::string pour_data_json(const PourData &d) {
   JsonWriter w;
   w.begin_object();
-  w.key("meter");
+  w.key("meter_number");
   w.value(static_cast<uint32_t>(d.meter));
   w.key("pour_id");
   w.value(d.pour_id);
@@ -17,10 +17,6 @@ std::string pour_data_json(const PourData &d) {
   w.value(d.volume_ml, 3);
   w.key("duration_ms");
   w.value(d.duration_ms);
-  if (!d.user.empty()) {
-    w.key("user");
-    w.value(d.user);
-  }
   if (!d.auth_device.empty()) {
     w.key("auth_device");
     w.value(d.auth_device);
@@ -28,6 +24,10 @@ std::string pour_data_json(const PourData &d) {
   if (!d.auth_token.empty()) {
     w.key("auth_token");
     w.value(d.auth_token);
+  }
+  if (!d.grant_id.empty()) {
+    w.key("grant_id");
+    w.value(d.grant_id);
   }
   if (d.ticks != UINT32_MAX) {
     w.key("ticks");
@@ -48,7 +48,7 @@ std::string pour_data_json(const PourData &d) {
 std::string pour_update_data_json(uint8_t meter, const std::string &pour_id, float volume_ml, uint32_t duration_ms) {
   JsonWriter w;
   w.begin_object();
-  w.key("meter");
+  w.key("meter_number");
   w.value(static_cast<uint32_t>(meter));
   w.key("pour_id");
   w.value(pour_id);
@@ -71,8 +71,8 @@ std::string temperature_data_json(const std::string &sensor, float temp_c) {
   return w.str();
 }
 
-std::string token_data_json(const std::string &auth_device, const std::string &token, bool attached, TokenStatus status,
-                            const std::string &user) {
+std::string token_data_json(const std::string &auth_device, const std::string &token, bool attached,
+                            TokenStatus status) {
   JsonWriter w;
   w.begin_object();
   w.key("auth_device");
@@ -84,10 +84,6 @@ std::string token_data_json(const std::string &auth_device, const std::string &t
   if (status != TokenStatus::NONE) {
     w.key("status");
     w.value(status == TokenStatus::ACCEPTED ? "accepted" : "denied");
-  }
-  if (!user.empty()) {
-    w.key("user");
-    w.value(user);
   }
   w.end_object();
   return w.str();
@@ -122,7 +118,7 @@ std::string status_data_json(const StatusData &d) {
     w.begin_array();
     for (const auto &m : d.meters) {
       w.begin_object();
-      w.key("meter");
+      w.key("meter_number");
       w.value(static_cast<uint32_t>(m.meter));
       w.key("total_ticks");
       w.value(m.total_ticks);
@@ -132,6 +128,47 @@ std::string status_data_json(const StatusData &d) {
     }
     w.end_array();
   }
+  if (!d.relays.empty()) {
+    w.key("relays");
+    w.begin_array();
+    for (uint8_t relay : d.relays) {
+      w.begin_object();
+      w.key("relay_number");
+      w.value(static_cast<uint32_t>(relay));
+      w.end_object();
+    }
+    w.end_array();
+  }
+  w.end_object();
+  return w.str();
+}
+
+std::string grant_end_data_json(const GrantEnd &end) {
+  JsonWriter w;
+  w.begin_object();
+  w.key("meter_numbers");
+  w.begin_array();
+  for (uint8_t meter : end.meters)
+    w.value(static_cast<uint32_t>(meter));
+  w.end_array();
+  w.key("reason");
+  w.value(grant_end_reason_str(end.reason));
+  if (!end.auth_device.empty()) {
+    w.key("auth_device");
+    w.value(end.auth_device);
+  }
+  if (!end.token.empty()) {
+    w.key("auth_token");
+    w.value(end.token);
+  }
+  if (!end.grant_id.empty()) {
+    w.key("grant_id");
+    w.value(end.grant_id);
+  }
+  w.key("volume_ml");
+  w.value(end.volume_ml, 3);
+  w.key("duration_ms");
+  w.value(end.duration_ms);
   w.end_object();
   return w.str();
 }
