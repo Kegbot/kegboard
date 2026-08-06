@@ -5,7 +5,7 @@
 project = "Kegboard"
 copyright = "2003-2026, The Kegbot Project Contributors"
 author = "The Kegbot Project Contributors"
-release = "4.0.0-dev"
+release = "4.0.0-pre1"
 
 extensions = [
     "myst_parser",

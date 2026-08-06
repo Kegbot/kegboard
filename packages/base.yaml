@@ -16,7 +16,7 @@ esphome:
   name_add_mac_suffix: false
   project:
     name: kegbot.kegboard
-    version: 4.0.0-dev
+    version: 4.0.0-pre1
 
 logger:
 

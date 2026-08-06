@@ -106,6 +106,27 @@ logger:
 builds pay nothing. The logger truncates lines to its buffer (default 512
 bytes); add `logger: { tx_buffer_size: 2048 }` if a batch body clips.
 
+## Cutting a release
+
+The canonical firmware version is `KEGBOARD_VERSION` in
+`components/kegboard/kegboard.cpp`; `docs/conf.py` and `packages/base.yaml`
+mirror it and must always agree. Don't edit them by hand — release with:
+
+```console
+$ script/bump.py --dry-run   # preview
+$ script/bump.py             # 4.0.1 -> 4.0.2; a -pre/-dev suffix is dropped
+$ script/bump.py 4.1.0       # or pick the version explicitly
+```
+
+`bump.py` verifies the tree is clean and the tag is free, updates all three
+version files, dates the changelog's "Current version (in development)"
+section as `## vX.Y.Z (YYYY-MM-DD)` (leaving a fresh open section above it),
+commits, and creates the `vX.Y.Z` tag. It does not push; publish with:
+
+```console
+$ git push origin HEAD vX.Y.Z
+```
+
 ## Protocol changes
 
 The [event protocol](kegboard-event-protocol.md) and

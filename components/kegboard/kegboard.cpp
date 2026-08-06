@@ -9,7 +9,7 @@ namespace esphome::kegboard {
 
 static const char *const TAG = "kegboard";
 
-const char *const KEGBOARD_VERSION = "4.0.0-dev";
+const char *const KEGBOARD_VERSION = "4.0.0-pre1";
 
 void KegboardHub::setup() {
   if (!this->serial_number_.empty())
