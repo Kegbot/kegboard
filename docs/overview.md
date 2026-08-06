@@ -2,19 +2,21 @@
 
 ## What is a Kegboard?
 
-*Kegboard* is the controller board in a [Kegbot](https://kegbot.org/) system:
-the device that watches the flow meters, temperature sensors, and auth tokens
-on a kegerator, and drives its valves, relays, and buzzer.
+*Kegboard* is the controller board in a [Kegbot](https://kegbot.org/) system.
+It's the device that monitors flow meters and publishes this data to a system
+like [Kegbot Backend](https://github.com/kegbot/kegbot-backend).
 
-Kegboard v4 is a **networked appliance**. The board detects pours itself,
-applies its own calibration, and reports finished drinks over WiFi — there is
-no host daemon and no USB cable. It is built as a set of
-[ESPHome](https://esphome.io/) external components, so a Kegboard is defined
-by a YAML file and extended the same way.
+A kegboard can also monitor additional, optional accessories like temperature sensors
+and OneWire-based authentication devices; and it can drive valves,
+relays, and buzzers.
 
-Previous Kegboard designs (v1–v3) were Arduino- and PIC-based sensor boards
-that streamed raw ticks over serial; they are preserved, feature-frozen, on
-the [`arduino` branch](https://github.com/Kegbot/kegboard/tree/arduino).
+An open source Kegboard project has existed since around 2005. Today, it is
+built for esp32-based devices, and leverages the [ESPHome](https://esphome.io/)
+framework.
+
+You can flash this firmware to a device and use it in standalone mode, or
+point it at a [Kegbot Server](https://github.com/Kegbot/kegbot-server) instance
+for full functionality.
 
 ## Features
 
@@ -61,9 +63,3 @@ reader, and no server still meters pours.
   [Installation](installation.md).
 - Optionally, a **[Kegbot Server](https://github.com/Kegbot/kegbot-server)**
   (or anything else implementing the event protocol) to record drinks.
-
-## Status
-
-Kegboard v4 is under active construction; see the status table in the
-[README](https://github.com/Kegbot/kegboard#status). Reporting is HTTP-only for now — MQTT, BLE,
-and WebSocket transports are planned.

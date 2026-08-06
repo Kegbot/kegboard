@@ -1,8 +1,5 @@
 # Authenticated Pouring
 
-**Status:** DRAFT — companion to the [Kegboard Event Protocol](kegboard-event-protocol.md)
-**Date:** 2026-08-03
-
 How a token presented at a Kegboard becomes an open valve and an attributed
 pour. This document specifies the interaction between device and server; the
 message envelopes it uses (`token` events, commands, `command_result`) are

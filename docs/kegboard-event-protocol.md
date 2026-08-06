@@ -1,41 +1,30 @@
 # Kegboard Event Protocol
 
 **Version:** 1
-**Date:** 2026-08-04
 
-The protocol a Kegboard controller uses to talk to a server. It replaces both
-the legacy KBSP serial protocol and the legacy pykeg HTTP API; neither
-survives in Kegboard v4.
+The protocol a Kegboard controller uses to talk to a server.
 
 Companion document: [Authenticated Pouring](authenticated-pouring.md), which
 specifies how token presentment, server-side authorization, and valve control
 compose on top of this protocol.
 
-## 1. Goals
+## 1. Protocol Goals
 
-- **One endpoint, one document.** A third party should be able to receive
+- **One endpoint, one document schema.** A third party should be able to receive
   Kegboard data by implementing a single HTTP handler against a single JSON
   Schema. This document plus the schemas is the whole contract.
 - **The device is authoritative for volume.** Calibration (`ml_per_tick`)
-  lives on the controller. Reports carry `volume_ml` always; raw ticks are
-  advisory diagnostics.
+  lives on the controller. Reports always carry `volume_ml`. Raw meter
+  values ("ticks") may be reported, but only as diagnostic values.
 - **Outage-proof.** Events queue on the device and deliver late with correct
   timestamps, without requiring the device to have a synchronized clock.
 - **Exactly-once effect.** Delivery is at-least-once; event ids make
   processing idempotent, so a retry can never create a duplicate drink.
-- **No walking keys around.** An unprovisioned device pairs through an
-  allow/deny decision on the server dashboard (§8); the user never handles a
-  credential.
+- **Simple authentication.** Devices stream data to endpoint that may optionally
+  require authentication. A simple pairing protocol makes it happen.
 - **Transport-portable.** The envelope is defined over HTTP here, but carries
   no HTTP-isms in the body, so the same messages can later ride MQTT, BLE, or
   WebSocket unchanged.
-
-### Non-goals (v1)
-
-- **Server-initiated connections.** The device accepts no inbound
-  connections. All server→device traffic (authorization, config push, valve
-  commands) rides the response to device-initiated requests (§7).
-- **Discovery and fleet management.** Out of scope.
 
 ## 2. Transport
 
