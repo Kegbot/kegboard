@@ -1,14 +1,9 @@
 # Kegboard Manual
 
-The manual for **Kegboard v4**, the ESP32-based kegerator controller built on
-[ESPHome](https://esphome.io/).
-
-New here? Start with the [Overview](overview.md), then pick an
-[operating mode](operating-modes.md) and follow
-[Installation](installation.md).
+This is the manual for **Kegboard**, the ESP32-based hardware controller for a [Kegbot](https://kegbot.org/).
 
 ```{toctree}
-:caption: Manual
+:caption: Kegboard Manual
 :maxdepth: 1
 
 overview
@@ -18,16 +13,13 @@ hardware
 configuration
 operation
 developer-notes
+changelog
 ```
 
 ```{toctree}
-:caption: "Appendix: Protocol"
+:caption: "Appendix"
 :maxdepth: 1
 
 kegboard-event-protocol
 authenticated-pouring
 ```
-
-The protocol appendix is the device↔server contract; the JSON Schemas in
-[`schemas/`](https://github.com/Kegbot/kegboard/tree/main/schemas) are
-normative.

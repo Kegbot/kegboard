@@ -40,27 +40,6 @@ Kegboard v4 is a networked appliance:
 - **It's ESPHome.** Adding a display, a pressure sensor, a second thermometer,
   or a different RFID reader is YAML you write, not a firmware release we ship.
 
-## Status
-
-Early. Under active construction — see the table below.
-
-| Area | State |
-|---|---|
-| Core logic (pour detection, event protocol, grants) | Done, unit tested |
-| `kegboard` hub + `kegboard_meter` | Done |
-| `kegboard_reporter` (event protocol, pairing, commands) | Done |
-| `kegboard_auth` (server-decided grants) | Done |
-| Temperature via stock `dallas_temp` | Works |
-| Relays with watchdog, buzzer, flow LEDs | Done |
-| Auth readers (RFID, iButton) | Done |
-| Server implementing the protocol | In progress (kegbot-server) |
-| Prebuilt binaries + web installer | Planned |
-
-Nothing has been validated against real hardware and a live Kegbot Server yet.
-
-Reporting is **HTTP only** for now. MQTT, BLE, and WebSocket transports are
-planned.
-
 ## Configuration
 
 A minimal two-tap board reporting to a server:
